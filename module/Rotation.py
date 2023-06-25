@@ -18,14 +18,6 @@ ROT_TYPES = [
     # 'rpy'   # Roll-Pitch-Yaw, Note that Ordering is matter # TODO
 ]
 
-def outer_product(vec1:torch.Tensor, vec2:torch.Tensor):
-    """single or batch-based outer product"""
-    assert (len(vec1.shape) == 2 and len(vec2.shape) == 2), "vector's shape is unvalid to compute outer product"
-    return torch.einsum('bi, bj -> bij', vec1, vec2)
-
-def sinc(x:torch.Tensor) -> torch.Tensor:
-    return x.sin() / x
-
 def is_SO3(x: Array) -> bool:
     """
     Check given rotation array's type is either SO3 or not.
@@ -127,16 +119,16 @@ class Rotation:
     
     # constructor
     @staticmethod
-    def create_from_mat3(mat3: Array):
+    def from_mat3(mat3: Array):
         return Rotation(mat3, 'SO3')
     @staticmethod
-    def create_from_so3(so3: Array):
+    def from_so3(so3: Array):
         return Rotation(so3, 'so3')
     @staticmethod
-    def create_from_quat_xyzw(quat: Array):
+    def from_quat_xyzw(quat: Array):
         return Rotation(quat, 'quat_xyzw')
     @staticmethod
-    def create_from_quat_wxyz(quat: Array):
+    def from_quat_wxyz(quat: Array):
         return Rotation(quat, 'quat_wxyz')
     
     def to_tensor(self, device: Any = 'cpu') -> None:

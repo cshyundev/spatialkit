@@ -46,4 +46,32 @@ def expand_dim(x: Array, dim: int) -> Array:
 
 def concat(x: List[Array], dim: int) -> Array:
      if is_tensor(x[0]): return torch.cat(x, dim=dim)
-     else: return np.concatenate(x, axis=dim)
+     return np.concatenate(x, axis=dim)
+
+def ones_like(x: Array) -> Array:
+    assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")
+    if is_tensor(x): return torch.ones_like(x)
+    return np.ones_like(x)
+
+def zeros_like(x: Array) -> Array:
+    if is_tensor(x): return torch.zeros_like(x)
+    return np.zeros_like(x)
+
+def norm_l2(x: Array, dim:int, keepdim:bool=True):
+    if is_tensor(x): return torch.norm(x,dim=dim,keepdim=keepdim)    
+    return np.linalg.norm(x,axis=dim,keepdims=keepdim)
+
+def normalize(x: Array, dim: int, eps:float=1e-6) -> Array:
+    norm = norm_l2(x,dim)
+    return x / (norm + eps)
+
+
+if __name__ == '__main__':
+    arr = np.ones(4)
+    norm_arr = normalize(arr,0)
+    norm = norm_l2(arr,0,False)
+    
+    print(arr)
+    print(norm_arr)
+    print(norm)
+    
