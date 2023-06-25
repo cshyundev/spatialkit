@@ -4,13 +4,14 @@ from typing import Tuple
 
 import os
 import sys
-# print(os.path.dirname(os.path.abspath(__file__)))
+print(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from Rotation import Rotation
+from .module.rotation import Rotation
 from data import *
 
+    
 class Pose:
-        """
+    """
         Rigid Transfrom Class
         Basically Save Camera Coord. to World Coord. Transform
     
@@ -35,26 +36,6 @@ class Pose:
         
         self.t:Array = t
         self.rot:Rotation = rot
-
-    def numpy(self, out_Rtype:str) -> Tuple[np.ndarray, np.ndarray, str]:
-        if out_Rtype == 'SO3':
-            self.R_data = self.R_data.SO3()
-        elif out_Rtype == 'so3':
-            self.R_data = self.R_data.so3()
-        if out_Rtype == 'quat':
-            self.R_data = self.R_data.quat()
-        else:
-            raise AssertionError('Unvalid rotation type!')
-
-        t = self.t_data.numpy()
-        R, R_type = self.R_data.numpy()
-        return t, R, R_type
-
-    def SE3(self):
-        raise NotImplementedError
-
-    def se3(self):
-        raise NotImplementedError
 
     @staticmethod
     def from_se3(se3: Array):
@@ -83,9 +64,7 @@ class Pose:
         if mat.shape == (3,4):
             mat = concat([mat, np.array([0.,0.,0.,1.])], 1)
         return Pose.from_mat4(mat)        
-         
-    
-    
+            
 if __name__ == '__main__':
     data = torch.randn((4, 4))
     w = Pose.create_from_mat4(data)

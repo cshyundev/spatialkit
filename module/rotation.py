@@ -1,7 +1,8 @@
 import numpy as np
-import torch
 from data import *
-from pytorch3d import transforms as tr
+if TORCH_AVAILABLE:
+    from pytorch3d import transforms as tr
+
 from scipy.spatial.transform import Rotation as R
 
 import os

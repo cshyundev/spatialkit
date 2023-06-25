@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 from data import *
 from enum import Enum
 from typing import *
@@ -33,7 +32,7 @@ class Camera:
     def make_pixel_grid(self) -> np.ndarray:
         u, v = np.meshgrid(range(self.width), range(self.height))
         uv = concat([u.reshape((-1, 1)), v.reshape((-1, 1))], 1)
-        return uv
+        return uv 
     
     def get_rays(self) -> Array:
         raise NotImplementedError
@@ -87,8 +86,7 @@ class PinholeCamera(Camera):
         rays = concat([x,y,z], -1)
         if normalize: rays = normalize(rays, -1)
         return rays # (HW,3)
-    
-    
+        
 if __name__ == '__main__':
     
     cam_dict = {
