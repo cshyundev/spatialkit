@@ -2,9 +2,7 @@ import numpy as np
 from data import *
 if TORCH_AVAILABLE:
     from pytorch3d import transforms as tr
-
 from scipy.spatial.transform import Rotation as R
-
 import os
 import sys
 # print(os.path.dirname(os.path.abspath(__file__)))
@@ -73,7 +71,7 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
             Mat:(n,3,3), float, Rotation Matrix
     """
     if is_xyzw: # real part last
-        real = quat[:,3]
+        real = quat[:,3:4]
         img = quat[:,:3]
         quat = concat([real, img], 1)
     
@@ -140,10 +138,38 @@ class Rotation:
     def type(self):
         return type(self.data)
     
+    def mat(self,idx:int=0):
+        if idx < 0: return self.data
+        return self.data[idx,:]
+    
+    def apply_rot(self, pt3d: Array, idx:int=0):
+        ## R*pt3d: [3,3] * [n,3]
+        is_single = False
+        mat = self.data[idx,:]
+        if is_tensor(pt3d): mat = convert_tensor(mat,pt3d)
+        
+        if len(pt3d.shape) == 1:
+            pt3d = expand_dim(pt3d,0)
+            is_single = True
+        
+        pt3d = transpose2d(pt3d) # [3,n]
+        pt3d = matmul(mat, pt3d) # [3,3] * [3,n] = [3,n]
+        pt3d = transpose2d(pt3d) # [n,3]
+        return pt3d[0,:] if is_single else pt3d
+    
+    def inverse_rot_mat(self, idx:int=0)->Array:
+        rot = self.data[idx,:] # [3,3]
+        return transpose2d(rot)
+        
+    
 if __name__ == '__main__':
+    rot = [  0.9958109, -0.0487703,  0.0773446,
+           0.0526372,  0.9974220, -0.0487703,
+          -0.0747667,  0.0526372,  0.9958109 ]
 
-    mat3 = np.eye(3)
-    rot = Rotation.create_from_mat3(mat3)        
-    print(rot.data)
-    print(rot.data.shape)
-
+    mat3 = np.array(rot).reshape(3,3)
+    R = Rotation.from_mat3(mat3)    
+    inv_rot_mat = R.inverse_rot_mat()
+    rot_mat = R.mat()
+    print(inv_rot_mat@rot_mat)
+    

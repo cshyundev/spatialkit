@@ -65,13 +65,25 @@ def normalize(x: Array, dim: int, eps:float=1e-6) -> Array:
     norm = norm_l2(x,dim)
     return x / (norm + eps)
 
+def transpose2d(x:Array) -> Array:
+    assert len(x.shape) == 2, "Invalid Shape. Array must be 2D."
+    if is_tensor(x): return x.transpose(0,1)
+    return x.T
+
+def matmul(x:Array, y:Array) -> Array:
+    assert(type(x) == type(y)), f"two Array types must be same, but got {str(type(x))} and {str(type(y))}"
+    assert(x.shape[-1] == y.shape[0]), f"Invalid Shape. x:[m,n], y:[n,k], but got {str(x.shape)} and {str(y.shape)}."
+    
+    if is_tensor(x): return torch.matmul(x,y)
+    return x@y
 
 if __name__ == '__main__':
-    arr = np.ones(4)
-    norm_arr = normalize(arr,0)
-    norm = norm_l2(arr,0,False)
+    x = np.ones(6).reshape(2,3)
+    y = np.ones(6).reshape(3,2)
     
-    print(arr)
-    print(norm_arr)
-    print(norm)
+    x = torch.tensor(x)
+    y = torch.tensor(y)
+
+    xy = matmul(x,y)
+    print(xy)
     
