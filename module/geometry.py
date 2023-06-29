@@ -79,13 +79,17 @@ class MultiView:
     
     def essential_matrix(self, idx1:int, idx2:int):
         ## E = t×R,  
+        w1tow2 = self.relative_pose(idx1,idx2)
+        skew_t = w1tow2.skew_t()
+        r_mat = w1tow2.rot_mat()
+        return matmul(skew_t,r_mat)        
+    
+    def relative_pose(self, idx1:int, idx2:int) -> Pose:
         ## [R,t]: relative pose from frame1 to frame2
         ## Relative Pose = merge(world1tocam1)Pose2 - Pose1
-        relative_pose = merge_transform(self.poses[idx1].inverse_pose(), self.poses[idx2])
-        skew_t = relative_pose.skew_t()
-        r_mat = relative_pose.rot_mat()
-        E = skew_t@r_mat
-        return E        
+        w1toc = self.poses[idx1].inverse()
+        ctow2 = self.poses[idx2]
+        return w1toc.merge(ctow2)
     
     def draw_epipolar_line(self, idx1:int, idx2:int, save_path: str,
                            left_pt2d:List[Tuple[int]]=None):

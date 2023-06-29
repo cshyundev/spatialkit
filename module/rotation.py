@@ -81,10 +81,10 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
 class Rotation:
     """
     Rotation Class. This can be recieved one of types [SO3, so3, quat].
-    - if SO3(Rotation matrix), shape must be [n, 3, 3] or [3, 3]
-    - if so3(axis angle), shape must be [n, 3] or [3]
-    - if quat(Quaternion), shape must be [n, 4] or [4]
-    - default type is SO3 and default shape is [n, 3, 3]
+    - if SO3(Rotation matrix), shape must be [3, 3]
+    - if so3(axis angle), shape must be [3]
+    - if quat(Quaternion), shape must be [4]
+    - default type is SO3 and default shape is [3, 3]
     """
     # class ROTATION_TYPE:
     #     SO3       = 0x0001 # SO(3) Rotation Matrix
@@ -94,26 +94,20 @@ class Rotation:
     def __init__(self, data: Array, type_str: str) -> None:
         
         assert is_array(data)
-        assert len(data.shape) < 4 # invalid data shape        
+        assert len(data.shape) < 3 # invalid data shape        
         assert type_str in ROT_TYPES # invalid type string
         
         if type_str == 'SO3':
             if is_SO3(data) is False: 
                 raise Exception(f'Invalid Shape Error. SO3 must be (n,3,3) or (3,3), but got {data.shape}')
-            if len(data.shape) == 2:
-                self.data = expand_dim(data,0)
             else: self.data = data
         elif type_str == 'so3':
             if is_so3(data) is False:
                 raise Exception(f'Invalid Shape Error. so3 must be (n,3) or (3), but got {data.shape}')
-            if len(data.shape) == 1:
-                data = expand_dim(data,0)
             self.data = so3_to_SO3(data) 
         elif type_str == 'quat_xyzw' or type_str == 'quat_wxyz':
             if is_quat(data) is False:
                 raise Exception(f'Invalid Shape Error. Quaternion must be (n,4) or (4), but got {data.shape}')
-            if len(data.shape) == 1:
-                data = expand_dim(data,0)
             self.data = quat_to_SO3(data, type_str=='quat_xyzw')        
     
     # constructor
@@ -138,29 +132,31 @@ class Rotation:
     def type(self):
         return type(self.data)
     
-    def mat(self,idx:int=0):
-        if idx < 0: return self.data
-        return self.data[idx,:]
+    def mat(self):
+        return self.data
     
-    def apply_rot(self, pt3d: Array, idx:int=0):
+    def apply_pts3d(self, pts3d: Array):
         ## R*pt3d: [3,3] * [n,3]
-        is_single = False
-        mat = self.data[idx,:]
-        if is_tensor(pt3d): mat = convert_tensor(mat,pt3d)
+        mat = self.mat()
+        if is_tensor(pts3d): mat = convert_tensor(mat,pts3d)
         
-        if len(pt3d.shape) == 1:
-            pt3d = expand_dim(pt3d,0)
-            is_single = True
-        
-        pt3d = transpose2d(pt3d) # [3,n]
-        pt3d = matmul(mat, pt3d) # [3,3] * [3,n] = [3,n]
-        pt3d = transpose2d(pt3d) # [n,3]
-        return pt3d[0,:] if is_single else pt3d
+        pts3d = transpose2d(pts3d) # [3,n]
+        pts3d = matmul(mat, pts3d) # [3,3] * [3,n] = [3,n]
+        pts3d = transpose2d(pts3d) # [n,3]
+        return pts3d
     
-    def inverse_rot_mat(self, idx:int=0)->Array:
-        rot = self.data[idx,:] # [3,3]
-        return transpose2d(rot)
-        
+    def inverse_mat(self)->Array:
+        return transpose2d(self.data)
+    
+    def inverse(self) -> 'Rotation':
+        return Rotation.from_mat3(self.inverse_mat())
+    
+    def dot(self, rot:'Rotation') -> 'Rotation':
+        rot1_mat = self.mat()
+        rot2_mat = rot.mat()
+        if is_tensor(rot1_mat): rot2_mat = convert_tensor(rot2_mat,rot1_mat)    
+        rot_mat = matmul(rot1_mat,rot2_mat)
+        return Rotation.from_mat3(rot_mat)
     
 if __name__ == '__main__':
     rot = [  0.9958109, -0.0487703,  0.0773446,
@@ -168,8 +164,6 @@ if __name__ == '__main__':
           -0.0747667,  0.0526372,  0.9958109 ]
 
     mat3 = np.array(rot).reshape(3,3)
-    R = Rotation.from_mat3(mat3)    
-    inv_rot_mat = R.inverse_rot_mat()
-    rot_mat = R.mat()
-    print(inv_rot_mat@rot_mat)
-    
+    rot = Rotation.from_mat3(mat3)    
+    inv_rot = rot.inverse()
+    print(rot.dot(inv_rot).mat())
