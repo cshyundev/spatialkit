@@ -1,12 +1,35 @@
 import numpy as np
-from data import *
+from module.data import *
 from module.pose import Pose
 from module.camera import *
-from io import *
-from o3d import *
+from module.io import * 
+import open3d as o3d 
 from typing import *
 import os.path as osp 
+import cv2 as cv
+from matplotlib import pyplot as plt
 
+
+
+def make_point_cloud(pt3d: Array, colors: Optional[Array]=None, save_path:str=None):
+    pt3d = convert_numpy(pt3d)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pt3d)
+    if colors is not None:
+        colors = convert_numpy(colors)
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+    if save_path: o3d.io.write_point_cloud(save_path, pcd)
+    return pcd
+
+def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=None, save_path:str=None):
+    vertices, triangles = convert_numpy(vertices),convert_numpy(triangles)
+    mesh = o3d.geometry.TriangleMesh()
+    mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    mesh.triangles = o3d.utility.Vector3iVector(triangles)
+    if vertex_colors is not None:
+        mesh.vertex_colors = convert_numpy(vertex_colors)
+    if save_path: o3d.io.write_triangle_mesh(save_path, mesh)
+    return mesh
 
 class MultiView:
     """
@@ -104,14 +127,36 @@ class MultiView:
         
         raise NotImplementedError
     
-    def __draw_epipolar_line_between_pinholes(self, idx1:int, idx2:int, save_path:str,
-                                              left_pt2d:List[Tuple[int]]=None):
+    def __draw_lines(img1:np.ndarray,img2:np.ndarray, lines, left_pt2d):
+        return img1,img2
+    
+    def __draw_epipolar_line_between_pinholes(self, idx1:int, idx2:int,
+                                              left_pt2d:List[Tuple[int,int]]
+                                              ,save_path:str):
         """
         Draw Epipolar Line between Pinhole Cameras
-        l: 
+        Args:
+            idx1,idx2: left and right camera inices respectively
+            left_pt2d: [n,2], 2D points in Left Image
+            save_path: path to save the result
         """
-        return None
-    
+        assert(len(left_pt2d) > 0), ("To draw epipolar line, 2D points must be needed.")
+        
+        F = self.fundamental_matrix(idx1,idx2)
+        F = convert_numpy(F)
+        lines=[]
+        pts_homo=[]
+        for pt in left_pt2d:
+            pt_homo = np.array([pt[0], pt[1], 1.]).reshape(3,1)
+            pts_homo.append(pt_homo)
+            lines.append(F@pt_homo) 
+        img1, img2 = read_image(self.image_path[idx1]),read_image(self.image_path[idx2]) 
+        img1,img2 = self.__draw_lines(img1, img2, lines, left_pt2d)
+        
+        concated_image = concat_image([img1,img2], vertical=False)
+        
+        
+        return        
     
     def save_point_cloud(self, save_path: str):
         

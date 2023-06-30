@@ -7,7 +7,6 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
     
-
     
 if TORCH_AVAILABLE:
     Array = Union[np.ndarray, torch.Tensor]
@@ -77,13 +76,15 @@ def matmul(x:Array, y:Array) -> Array:
     if is_tensor(x): return torch.matmul(x,y)
     return x@y
 
-if __name__ == '__main__':
-    x = np.ones(6).reshape(2,3)
-    y = np.ones(6).reshape(3,2)
-    
-    x = torch.tensor(x)
-    y = torch.tensor(y)
+def permute(x:Array, dims:Tuple[int]) -> Array:
+    assert(len(x.shape) == len(dims)), (f"Shape of Array and Dimensions must be same, but got {str(x.shape)}, {str(dims)}")
+    if is_tensor(x): return x.permute(dims)
+    return x.transpose(dims)
 
-    xy = matmul(x,y)
-    print(xy)
+if __name__ == '__main__':
+    x = np.array(range(30)).reshape(2,3,5)
+    # print(permute(x,(1,2)).shape)
+    x = torch.tensor(x)
+    print(permute(x,(1,2)).shape)
+    
     
