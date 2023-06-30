@@ -78,9 +78,9 @@ class PinholeCamera(Camera):
     def inv_K(self):
         return np.linalg.inv(self.K)
     
-    def get_rays(self, normalize=False):
-        uv = self.make_pixel_grid() # (HW,2)
-        x = (uv[:,0:1] - self.cx) / self.fx
+    def get_rays(self, uv:np.ndarray=None,normalize:bool=False) -> np.ndarray:
+        if uv is None: uv = self.make_pixel_grid() # (HW,2)
+        x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
         y = (uv[:,1:2] - self.cy) / self.fy
         z = ones_like(x)
         rays = concat([x,y,z], -1)

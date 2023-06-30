@@ -22,6 +22,22 @@ def concat_images(images:List[Array], vertical:bool=False):
             if vertical: concated_imgs = concat([concat_images, convert_image(image)],0)
             else: concated_imgs = concat([concat_images, convert_image(image)],1)
         return concated_imgs
-            
-            
+
+def draw_circles(image:np.ndarray, pts2d:List[Tuple[int,int]], radius:int=1,
+                rgb:Tuple[int,int,int]=(255,0,0), thickness:int=2):
+    for pt2d in pts2d:
+        image = cv.circle(image, pt2d, radius, rgb, thickness)
+    return image
+
+def show_image(image:np.ndarray):
+    cv.imshow("Image", image)
+
+if __name__ == "__main__":
     
+    image = np.ones(640*480) * 255
+    image = image.reshape(640,480)
+    
+    pt2d = [(380,290)]
+    
+    image = draw_circles(image, pt2d, 4)
+    show_image(image)

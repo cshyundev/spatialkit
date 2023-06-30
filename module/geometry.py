@@ -2,12 +2,11 @@ import numpy as np
 from module.data import *
 from module.pose import Pose
 from module.camera import *
-from module.io import * 
+from module.io import *
+from module.plot import * 
 import open3d as o3d 
 from typing import *
 import os.path as osp 
-import cv2 as cv
-from matplotlib import pyplot as plt
 
 
 
@@ -127,7 +126,7 @@ class MultiView:
         
         raise NotImplementedError
     
-    def __draw_lines(img1:np.ndarray,img2:np.ndarray, lines, left_pt2d):
+    def __draw_epipolar_lines(img1:np.ndarray,img2:np.ndarray, lines, left_pt2d):
         return img1,img2
     
     def __draw_epipolar_line_between_pinholes(self, idx1:int, idx2:int,
@@ -153,9 +152,8 @@ class MultiView:
         img1, img2 = read_image(self.image_path[idx1]),read_image(self.image_path[idx2]) 
         img1,img2 = self.__draw_lines(img1, img2, lines, left_pt2d)
         
-        concated_image = concat_image([img1,img2], vertical=False)
-        
-        
+        concated_image = concat_images([img1,img2], vertical=False)
+
         return        
     
     def save_point_cloud(self, save_path: str):
@@ -182,10 +180,7 @@ class MultiView:
         raise NotImplementedError
 
 if __name__ == '__main__':
-    arr = np.ones(4)
-    norm_arr = normalize(arr,0)
-    norm = norm_l2(arr,0,False)
     
-    print(arr)
-    print(norm_arr)
-    print(norm)
+    multiview = MultiView.from_meta_data("", "")
+    
+    
