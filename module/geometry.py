@@ -150,7 +150,7 @@ class MultiView:
             pts_homo.append(pt_homo)
             lines.append(F@pt_homo) 
         img1, img2 = read_image(self.image_path[idx1]),read_image(self.image_path[idx2]) 
-        img1,img2 = self.__draw_lines(img1, img2, lines, left_pt2d)
+        img1,img2 = self.__draw_epipolar_lines(img1, img2, lines, left_pt2d)
         
         concated_image = concat_images([img1,img2], vertical=False)
 
@@ -176,9 +176,6 @@ class MultiView:
         
         make_point_cloud(pt3d, colors, save_path)
         
-        
-        raise NotImplementedError
-
 if __name__ == '__main__':
     
     multiview = MultiView.from_meta_data("", "")

@@ -3,9 +3,9 @@ from typing import *
 from module.data import *
 import os
 import os.path as osp
-import tifffile
-import skimage.io as skio
-from module.plot import *
+# import tifffile
+# import skimage.io as skio
+from PIL import Image
 
 def read_float(path: str) -> np.ndarray:
     extension = path.split(sep=".")[-1]
@@ -49,10 +49,10 @@ def read_image(path: str) -> np.ndarray:
         print("reading image failed.")
         return None
 
-# def write_image(image:Array, path: str):
-#     assert (is_image(image)), (f"Invalid Shape. Image's shape must be (H,W,3) or (3,H,W), but got {str(image.shape)}")
-#     image = convert_image(image)
-#     if 
+def write_image(image:Array, path: str):
+    pil_image = Image.fromarray(image)
+    extension = path.split(sep=".")[-1]
+    pil_image.save(path, 'extension')
 
 if __name__ == '__main__':
     path = "./hello/world.npy"
