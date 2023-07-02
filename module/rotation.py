@@ -85,14 +85,14 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     """
         Transform Quaternion to Rotation Matrix(SO3)
         Args:
-            quat:(n,4), float, quaternion
+            quat:(4), float, quaternion
             is_xyzw:scalar, bool, quat is real part first. Otherwise, real part is last channel
         return:
             Mat:(n,3,3), float, Rotation Matrix
     """
     if is_xyzw: # real part last
-        real = quat[:,3:4]
-        img = quat[:,:3]
+        real = quat[3:4]
+        img = quat[:3]
         quat = concat([real, img], 1)
     
     if is_tensor(quat): return tr.quaternion_to_matrix(quat)
