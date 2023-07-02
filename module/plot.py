@@ -1,4 +1,4 @@
-from module.data import *
+from module.hybrid_operations import *
 import matplotlib.pyplot as plt
 import os
 import cv2 as cv

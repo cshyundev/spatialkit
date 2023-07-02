@@ -1,7 +1,6 @@
 import numpy as np
-from data import *
-if TORCH_AVAILABLE:
-    from pytorch3d import transforms as tr
+from module.hybrid_operations import *
+from scipy.linalg import expm
 from scipy.spatial.transform import Rotation as R
 import os
 import sys
@@ -50,17 +49,38 @@ def is_quat(x: Array) -> bool:
     # [4] or [n,4]
     return shape[-1] == 4
 
+def exponential_map(mat: Array) -> Array:
+    if is_tensor(mat):
+        return torch.matrix_exp(mat)
+    else:
+        return expm(mat)
+
+def skew(x: Array) -> Array:
+    rx = x[0].item()
+    ry = x[1].item()
+    rz = x[2].item()
+    
+    skew_x = np.array([
+        [0, -rz,  ry],
+        [rz, 0., -rx],
+        [-ry, rx, 0.]
+    ])
+    if is_tensor(x): skew_x = convert_tensor(skew_x,x)
+    return skew_x
+
 def so3_to_SO3(so3: Array) -> Array:
     """
         Transform so3 to Rotation Matrix(SO3)
         Args:
-            so3:(n,3), float, so3
+            so3:(3,), float, so3
         return:
-            Mat:(n,3,3), float, Rotation Matrix
+            Mat:(3,3), float, Rotation Matrix
     """
-    if is_tensor(so3): return tr.so3_exponential_map(so3)
-    else: return R.from_rotvec(so3).as_matrix()
+    assert is_so3(so3) and len(so3.shape) == 1, (f"Invaild Shape. so3 must be (3), but got {str(so3.shape)}")
     
+    skew_so3 = skew(so3)
+    return exponential_map(skew_so3)
+
 def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     """
         Transform Quaternion to Rotation Matrix(SO3)
@@ -77,6 +97,9 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     
     if is_tensor(quat): return tr.quaternion_to_matrix(quat)
     else: return R.from_quat(quat).as_matrix() 
+
+
+
 
 class Rotation:
     """

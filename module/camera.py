@@ -1,8 +1,7 @@
 import numpy as np
-from data import *
+from module.hybrid_operations import *
 from enum import Enum
 from typing import *
-
 
 
 class CamType(Enum):
@@ -78,13 +77,13 @@ class PinholeCamera(Camera):
     def inv_K(self):
         return np.linalg.inv(self.K)
     
-    def get_rays(self, uv:np.ndarray=None,normalize:bool=False) -> np.ndarray:
+    def get_rays(self, uv:np.ndarray=None,norm:bool=False) -> np.ndarray:
         if uv is None: uv = self.make_pixel_grid() # (HW,2)
         x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
         y = (uv[:,1:2] - self.cy) / self.fy
         z = ones_like(x)
         rays = concat([x,y,z], -1)
-        if normalize: rays = normalize(rays, -1)
+        if norm: rays = normalize(rays, -1)
         return rays # (HW,3)
         
 if __name__ == '__main__':
@@ -103,7 +102,7 @@ if __name__ == '__main__':
     print(cam.K)
     
     print(cam.inv_K)
-    rays =cam.get_rays(False) 
+    rays =cam.get_rays() 
     print(rays.shape)
     
     

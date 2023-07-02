@@ -1,10 +1,11 @@
 import numpy as np
 from typing import *
-from module.data import *
+from module.hybrid_operations import *
 import os
 import os.path as osp
-# import tifffile
-# import skimage.io as skio
+import tifffile
+import skimage.io as skio
+import json
 from PIL import Image
 
 def read_float(path: str) -> np.ndarray:
@@ -54,6 +55,16 @@ def write_image(image:Array, path: str):
     extension = path.split(sep=".")[-1]
     pil_image.save(path, 'extension')
 
+def read_json(path: str) -> Dict[str,Any]:
+    try:
+        with open(path, "r") as f:
+            json_dict = json.load(f)
+        return json_dict 
+    except:
+        raise Exception("Reading json file Failed.")
+
 if __name__ == '__main__':
-    path = "./hello/world.npy"
-    print(read_float(path))
+    dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"
+    # print(osp.exists(dataset_path))
+    json_dict = read_json(dataset_path)
+    print(json_dict)

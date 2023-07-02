@@ -1,15 +1,7 @@
 import numpy as np
-import torch
-from typing import Tuple
+from module.rotation import Rotation
+from module.hybrid_operations import *
 
-import os
-import sys
-print(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from rotation import Rotation
-from data import *
-
-    
 class Pose:
     """
         Rigid Transfrom Class

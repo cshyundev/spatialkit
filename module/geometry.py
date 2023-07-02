@@ -1,8 +1,8 @@
 import numpy as np
-from module.data import *
+from module.hybrid_operations import *
 from module.pose import Pose
 from module.camera import *
-from module.io import *
+from module.file_utils import *
 from module.plot import * 
 import open3d as o3d 
 from typing import *
@@ -48,7 +48,7 @@ class MultiView:
         
         self.image_path = image_path
         self.cameras = cameras
-        self.poses: poses
+        self.poses = poses
         self.depth_path = depth_path
         self.normal_path = normal_path
         
@@ -72,17 +72,18 @@ class MultiView:
             image_path.append(osp.join(root_path,frame["rgb_path"]))
             depth_path.append(osp.join(root_path,frame["mono_depth_path"]))
             normal_path.append(osp.join(root_path,frame["mono_normal_path"])) 
-            poses.append(Pose.from_mat4(np.array(frame["camtoworld"]))) 
+            poses.append(Pose.from_mat(np.array(frame["camtoworld"]))) 
             # create camera
             K = frame["intrinsics"]
             cam_dict = {}
-            cam_dict["fx"] = K[0,0]
-            cam_dict["fy"] = K[1,1]
-            cam_dict["cx"] = K[0,2]
-            cam_dict["cy"] = K[1,2]
-            cam_dict["skew"] = K[0,1]
+            cam_dict["fx"] = K[0][0]
+            cam_dict["fy"] = K[1][1]
+            cam_dict["cx"] = K[0][2]
+            cam_dict["cy"] = K[1][2]
+            cam_dict["skew"] = K[0][1]
             cam_dict["height"] = height
             cam_dict["width"] = width
+            cam_dict["cam_type"] = meta_data["camera_model"]
             cameras.append(Camera.create_cam(cam_dict))
             
         return MultiView(image_path,cameras,poses,
@@ -122,10 +123,6 @@ class MultiView:
         if (cam1.cam_type == cam2.cam_type) and cam1.cam_type == CamType.PINHOLE:
             self.__draw_epipolar_line_between_pinholes(idx1,idx2, save_path, left_pt2d)
         
-        ## 
-        
-        raise NotImplementedError
-    
     def __draw_epipolar_lines(img1:np.ndarray,img2:np.ndarray, lines, left_pt2d):
         return img1,img2
     
@@ -176,8 +173,7 @@ class MultiView:
         
         make_point_cloud(pt3d, colors, save_path)
         
-if __name__ == '__main__':
-    
-    multiview = MultiView.from_meta_data("", "")
+# if __name__ == '__main__':
+    # multiview = MultiView.from_meta_data("", "")
     
     
