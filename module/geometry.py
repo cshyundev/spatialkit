@@ -6,7 +6,8 @@ from module.file_utils import *
 from module.plot import * 
 import open3d as o3d 
 from typing import *
-import os.path as osp 
+import os.path as osp
+import matplotlib.pyplot as plt 
 
 
 
@@ -96,62 +97,64 @@ class MultiView:
         inv_K1 = self.cameras[idx1].inv_K()
         inv_K2 = self.cameras[idx2].inv_K()
         E = self.essential_matrix(idx1,idx2)
-        F = matmul(inv_K1,E)
+        F = matmul(transpose2d(inv_K1),E)
         F = matmul(F,inv_K2)
         return F
     
     def essential_matrix(self, idx1:int, idx2:int):
         ## E = t×R,  
-        w1tow2 = self.relative_pose(idx1,idx2)
-        skew_t = w1tow2.skew_t()
-        r_mat = w1tow2.rot_mat()
+        w1_to_w2 = self.relative_pose(idx1,idx2)
+        skew_t = w1_to_w2.skew_t()
+        r_mat = w1_to_w2.rot_mat()
         return matmul(skew_t,r_mat)        
     
     def relative_pose(self, idx1:int, idx2:int) -> Pose:
         ## [R,t]: relative pose from frame1 to frame2
         ## Relative Pose = merge(world1tocam1)Pose2 - Pose1
-        w1toc = self.poses[idx1].inverse()
-        ctow2 = self.poses[idx2]
-        return w1toc.merge(ctow2)
+        w1_to_cam = self.poses[idx1].inverse()
+        cam_to_w2 = self.poses[idx2]
+        return w1_to_cam.merge(cam_to_w2)
     
-    def draw_epipolar_line(self, idx1:int, idx2:int, save_path: str,
+    def choice_points(self, idx1:int, idx2:int, n_points:int) -> List[Tuple[int,int]]:
+        left, right = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])
+        plt.subplot(1,2,1),plt.imshow(left)
+        plt.subplot(1,2,2),plt.imshow(right)
+        pts = plt.ginput(n_points)
+        pts = np.int32(pts)
+        plt.close()
+        return pts.tolist()
+    
+    def draw_epipolar_line(self, idx1:int, idx2:int,
                            left_pt2d:List[Tuple[int]]=None):
-        
         cam1 = self.cameras[idx1]
         cam2 = self.cameras[idx2]
-        
         if (cam1.cam_type == cam2.cam_type) and cam1.cam_type == CamType.PINHOLE:
-            self.__draw_epipolar_line_between_pinholes(idx1,idx2, save_path, left_pt2d)
-        
-    def __draw_epipolar_lines(img1:np.ndarray,img2:np.ndarray, lines, left_pt2d):
-        return img1,img2
+            return self.__draw_epipolar_line_between_pinholes(idx1,idx2, left_pt2d)
     
     def __draw_epipolar_line_between_pinholes(self, idx1:int, idx2:int,
-                                              left_pt2d:List[Tuple[int,int]]
-                                              ,save_path:str):
+                                              left_pt2d:List[Tuple[int,int]]) -> np.ndarray:
         """
         Draw Epipolar Line between Pinhole Cameras
         Args:
             idx1,idx2: left and right camera inices respectively
-            left_pt2d: [n,2], 2D points in Left Image
+            left_pt2d: (n,2), 2D points in left image
             save_path: path to save the result
+        Return:
+            Image: (H,2W,3) or (H,2W), float, 
         """
         assert(len(left_pt2d) > 0), ("To draw epipolar line, 2D points must be needed.")
+        left, right = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])
         
         F = self.fundamental_matrix(idx1,idx2)
         F = convert_numpy(F)
-        lines=[]
-        pts_homo=[]
         for pt in left_pt2d:
-            pt_homo = np.array([pt[0], pt[1], 1.]).reshape(3,1)
-            pts_homo.append(pt_homo)
-            lines.append(F@pt_homo) 
-        img1, img2 = read_image(self.image_path[idx1]),read_image(self.image_path[idx2]) 
-        img1,img2 = self.__draw_epipolar_lines(img1, img2, lines, left_pt2d)
-        
-        concated_image = concat_images([img1,img2], vertical=False)
-
-        return        
+            pt_homo = np.array([pt[0], pt[1], 1.])
+            color = tuple(np.random.randint(0,255,3).tolist())
+            left = draw_circle(left, pt, 1,color,2)
+            right = draw_line_by_line(right,tuple((F@pt_homo).tolist()), color, 2)            
+                     
+        image = concat_images([left,right], vertical=False)
+        return image        
     
     def save_point_cloud(self, save_path: str):
         
@@ -172,7 +175,8 @@ class MultiView:
         colors = concat(colors, 0)            
         
         make_point_cloud(pt3d, colors, save_path)
-        
+    
+    
 # if __name__ == '__main__':
     # multiview = MultiView.from_meta_data("", "")
     

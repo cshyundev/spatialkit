@@ -53,7 +53,7 @@ def read_image(path: str) -> np.ndarray:
 def write_image(image:Array, path: str):
     pil_image = Image.fromarray(image)
     extension = path.split(sep=".")[-1]
-    pil_image.save(path, 'extension')
+    pil_image.save(path, extension)
 
 def read_json(path: str) -> Dict[str,Any]:
     try:

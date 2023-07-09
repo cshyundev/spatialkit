@@ -63,7 +63,6 @@ class PinholeCamera(Camera):
         self.cy = cam_dict['cy']
         self.skew = cam_dict['skew']
     
-    @property
     def K(self):
         K = np.eye(3)
         K[0,0] = self.fx
@@ -73,9 +72,8 @@ class PinholeCamera(Camera):
         K[1,2] = self.cy
         return K
     
-    @property
     def inv_K(self):
-        return np.linalg.inv(self.K)
+        return np.linalg.inv(self.K())
     
     def get_rays(self, uv:np.ndarray=None,norm:bool=False) -> np.ndarray:
         if uv is None: uv = self.make_pixel_grid() # (HW,2)

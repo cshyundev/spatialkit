@@ -1,6 +1,5 @@
 from module.hybrid_operations import *
 import matplotlib.pyplot as plt
-import os
 import cv2 as cv
 
 def is_image(image:Array) -> bool:
@@ -18,20 +17,40 @@ def convert_image(image: Array) -> Array:
     return image
         
 def concat_images(images:List[Array], vertical:bool=False):
-        concated_imgs = convert_image(images[0]) 
+        concated_images = convert_image(images[0]) 
         for image in images[1:]:
-            if vertical: concated_imgs = concat([concated_imgs, convert_image(image)],0)
-            else: concated_imgs = concat([concated_imgs, convert_image(image)],1)
-        return concated_imgs
+            if vertical: concated_images = concat([concated_images, convert_image(image)],0)
+            else: concated_images = concat([concated_images, convert_image(image)],1)
+        return concated_images
 
-def draw_circles(image:np.ndarray, pts2d:List[Tuple[int,int]], radius:int=1,
-                rgb:Tuple[int,int,int]=(255,0,0), thickness:int=2):
-    for pt2d in pts2d:
-        image = cv.circle(image, tuple(reversed(pt2d)), radius, rgb, thickness)
-    return image
+def draw_circle(image:np.ndarray, pt2d:Tuple[int,int], radius:int=1,
+                rgb:Tuple[int,int,int]=None, thickness:int=2):
+    if rgb is None: rgb = tuple(np.random.randint(0,255,3).tolist())
+    return cv.circle(image, pt2d, radius, rgb, thickness)
 
+def draw_line_by_points(image:np.ndarray, pt1: Tuple[int,int], pt2: Tuple[float,float],
+              rgb:Tuple[int,int,int]=None, thickness:int=2) -> np.ndarray:
+    if rgb is None: rgb = tuple(np.random.randint(0,255,3).tolist())
+    return cv.line(image, pt1, pt2, rgb, thickness)
+
+def draw_line_by_line(image:np.ndarray, line: Tuple[float,float,float],
+                      rgb:Tuple[int,int,int]=None, thickness:int=2) ->np.ndarray:
+    """
+    Draw Line by (a,b,c). (a,b,c) means a line: ax + by + c = 0
+    Args:
+        image: (H,W,3) or (H,W), float
+        line: (3,), float, line parameter (a,b,c)
+        rgb: (3,), int, RGB color
+        thickness: scalar, int, thickness of the line
+    """
+    if rgb is None: rgb = tuple(np.random.randint(0,255,3).tolist())
+    _,w = image.shape[:2]
+    x0,y0 = map(int, [0, -line[2]/line[1] ])
+    x1,y1 = map(int, [w, -(line[2]+line[0]*w)/line[1]])
+    return cv.line(image,(x0,y0), (x1,y1), rgb, thickness)
+    
 def show_image(image:np.ndarray):
-    cv.imshow("Image", image)
+    plt.imshow(image)
 
 if __name__ == "__main__":
     
@@ -39,4 +58,4 @@ if __name__ == "__main__":
     image = image.reshape(640,480)
     
     pt2d = [(380,290)]
-    image = draw_circles(image, pt2d, 2)
+    image = draw_circle(image, pt2d, 2)

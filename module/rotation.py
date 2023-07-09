@@ -98,9 +98,6 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     if is_tensor(quat): return tr.quaternion_to_matrix(quat)
     else: return R.from_quat(quat).as_matrix() 
 
-
-
-
 class Rotation:
     """
     Rotation Class. This can be recieved one of types [SO3, so3, quat].

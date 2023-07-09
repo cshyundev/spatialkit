@@ -2,7 +2,7 @@ import numpy as np
 from module.plot import *
 from module.geometry import MultiView
 from module.pose import Pose
-from module.file_utils import read_json
+from module.file_utils import read_json, write_image
 import os.path as osp
 
 def main():
@@ -11,10 +11,9 @@ def main():
     
     multiviews = MultiView.from_meta_data(dataset_path, meta_dict)
     
-    pose = multiviews.relative_pose(0,1)
-    print(pose.t)
-    print(pose.rot_mat())
+    pts2d  = multiviews.choice_points(0,3,1)
+    image = multiviews.draw_epipolar_line(0,3,pts2d)
+    write_image(image, "./epipolar.png")
     
-
 if __name__ == "__main__":
     main() 
