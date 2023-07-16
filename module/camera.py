@@ -92,18 +92,18 @@ class PinholeCamera(Camera):
                  uv: np.ndarray=None, 
                  norm: bool=False,
                  err_thr: float = 1e-6,
-                 max_iter:int = 5
+                 max_iter:int = 10
                  ) -> np.ndarray:
         if uv is None: uv = self.make_pixel_grid() # (HW,2)
         x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
         y = (uv[:,1:2] - self.cy) / self.fy
-        # if len(self.radial_params) > 0:
-        #     for _ in range(max_iter):
-        #         x_d,y_d = self.__distort(x,y)
-        #         err_x = x_d - x
-        #         err_y = y_d - y
-        #         x = x - err_x
-
+        if len(self.radial_params) > 0:
+            for _ in range(max_iter):
+                x_d, y_d = self.__distort(x,y)
+                err_x, err_y = x_d - x, y_d - y
+                x, y = x - err_x, y - err_y
+                err = sqrt(err_x**2 + err_y**2).max()
+                if err < err_thr: break
         z = ones_like(x)
         rays = concat([x,y,z], -1)
         if norm: rays = normalize(rays, -1)
@@ -149,9 +149,6 @@ if __name__ == '__main__':
         'skew': 1.4
     }    
     cam = Camera.create_cam(cam_dict)
-    print(cam.K)
-    
-    print(cam.inv_K)
     rays =cam.get_rays() 
     print(rays.shape)
     

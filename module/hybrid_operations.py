@@ -81,10 +81,14 @@ def permute(x:Array, dims:Tuple[int]) -> Array:
     if is_tensor(x): return x.permute(dims)
     return x.transpose(dims)
 
+def sqrt(x: Array) -> Array:
+    if is_tensor(x): return torch.sqrt(x)
+    return np.sqrt(x)
+
 if __name__ == '__main__':
     x = np.array(range(30)).reshape(2,3,5)
     # print(permute(x,(1,2)).shape)
-    x = torch.tensor(x)
-    print(permute(x,(1,2)).shape)
+    # x = torch.tensor(x)
+    sqrt_x = sqrt(x)
     
     
