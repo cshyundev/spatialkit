@@ -88,6 +88,18 @@ def permute(x:Array, dims:Tuple[int]) -> Array:
     if is_tensor(x): return x.permute(dims)
     return x.transpose(dims)
 
+def deep_copy(x:Array) -> Array:
+    if is_tensor(x): return x.clone()
+    return np.copy(x)
+
+def where(condition:Array, x:Array, y:Array) -> Array:
+    if is_tensor(condition): return torch.where(condition,x,y)
+    return np.where(condition,x,y)    
+
+def abs(x:Array) -> Array:
+    if is_tensor(x): torch.abs(x)
+    return np.abs(x)
+
 if __name__ == '__main__':
     x = np.array(range(30)).reshape(2,3,5)
     # print(permute(x,(1,2)).shape)
