@@ -1,6 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./computer_vision_python",
-        "./computer_vision_python/module"
-    ]
-}

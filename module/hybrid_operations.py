@@ -1,43 +1,50 @@
 import numpy as np
+from numpy import ndarray
 from typing import *
 
 try:
     import torch
+    from torch import Tensor
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
     
     
 if TORCH_AVAILABLE:
-    Array = Union[np.ndarray, torch.Tensor]
+    Array = Union[ndarray, Tensor]
 else:
-    Array = np.ndarray
+    Array = ndarray
 
 def is_tensor(x: Array) -> bool:
-    if TORCH_AVAILABLE: return type(x) == torch.Tensor
+    if TORCH_AVAILABLE: return type(x) == Tensor
     else: return False    
 
 def is_numpy(x: Array) -> bool:
-    return type(x) == np.ndarray
+    return type(x) == ndarray
 
 def is_array(x: Any) -> bool:
     return is_tensor(x) or is_numpy(x)
 
-def convert_tensor(x: Array, tensor: torch.Tensor = None) -> torch.Tensor:
+def convert_tensor(x: Array, tensor: Tensor = None) -> Tensor:
     assert TORCH_AVAILABLE
     if is_tensor(x): return x 
     if tensor is not None:    
         assert is_tensor(tensor)
         x_tensor = torch.tensor(x, dtype=tensor.dtype, device=tensor.device)
     else:
-        x_tensor = torch.Tensor(x)
+        x_tensor = Tensor(x)
     return x_tensor
         
-def convert_numpy(x: Array) -> np.ndarray:  
+def convert_numpy(x: Array) -> ndarray:  
     if is_tensor(x): x_numpy = x.detach().cpu().numpy()
     elif is_numpy(x): x_numpy = x
     else: raise TypeError
     return x_numpy
+
+def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor) -> Dict[Any,Tensor]:
+    for key in dict.keys():
+        if is_numpy(dict[key]): dict[key] = convert_tensor(dict[key], tensor)
+    return dict
 
 def expand_dim(x: Array, dim: int) -> Array:
     if is_tensor(x): return x.unsqueeze(dim)
@@ -56,30 +63,21 @@ def zeros_like(x: Array) -> Array:
     if is_tensor(x): return torch.zeros_like(x)
     return np.zeros_like(x)
 
-def norm_l2(x: Array, dim:int, keepdim:bool=True):
-    if is_tensor(x): return torch.norm(x,dim=dim,keepdim=keepdim)    
-    return np.linalg.norm(x,axis=dim,keepdims=keepdim)
+def deep_copy(x:Array) -> Array:
+    if is_tensor(x): return x.clone()
+    return np.copy(x)
 
-def normalize(x: Array, dim: int, eps:float=1e-6) -> Array:
-    norm = norm_l2(x,dim)
-    return x / (norm + eps)
+def where(condition:Array, x:Array, y:Array) -> Array:
+    if is_tensor(condition): return torch.where(condition,x,y)
+    return np.where(condition,x,y)    
 
-def transpose2d(x:Array) -> Array:
-    assert len(x.shape) == 2, "Invalid Shape. Array must be 2D."
-    if is_tensor(x): return x.transpose(0,1)
-    return x.T
+def abs(x:Array) -> Array:
+    if is_tensor(x): torch.abs(x)
+    return np.abs(x)
 
-def matmul(x:Array, y:Array) -> Array:
-    assert(type(x) == type(y)), f"two Array types must be same, but got {str(type(x))} and {str(type(y))}"
-    assert(x.shape[-1] == y.shape[0]), f"Invalid Shape. x:[m,n], y:[n,k], but got {str(x.shape)} and {str(y.shape)}."
-    
-    if is_tensor(x): return torch.matmul(x,y)
-    return x@y
-
-def permute(x:Array, dims:Tuple[int]) -> Array:
-    assert(len(x.shape) == len(dims)), (f"Shape of Array and Dimensions must be same, but got {str(x.shape)}, {str(dims)}")
-    if is_tensor(x): return x.permute(dims)
-    return x.transpose(dims)
+def sqrt(x: Array) -> Array:
+    if is_tensor(x): return torch.sqrt(x)
+    return np.sqrt(x)
 
 def sqrt(x: Array) -> Array:
     if is_tensor(x): return torch.sqrt(x)
