@@ -91,12 +91,30 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
             Mat:(n,3,3), float, Rotation Matrix
     """
     if is_xyzw: # real part last
-        real = quat[3:4]
-        img = quat[:3]
-        quat = concat([real, img], 1)
+        x, y, z, w = quat[0],quat[1],quat[2],quat[3] 
+    else:
+        w, x, y, z = quat[0], quat[1],quat[2],quat[3] 
+
+    # Compute the elements of the rotation matrix
+    m00 = 1 - 2 * (y**2 + z**2)
+    m01 = 2 * (x * y - z * w)
+    m02 = 2 * (x * z + y * w)
     
-    if is_tensor(quat): return tr.quaternion_to_matrix(quat)
-    else: return R.from_quat(quat).as_matrix() 
+    m10 = 2 * (x * y + z * w)
+    m11 = 1 - 2 * (x**2 + z**2)
+    m12 = 2 * (y * z - x * w)
+    
+    m20 = 2 * (x * z - y * w)
+    m21 = 2 * (y * z + x * w)
+    m22 = 1 - 2 * (x**2 + y**2)
+    
+    # Create the rotation matrices for each quaternion
+    rotation_matrix = concat([concat([m00, m01, m02], dim=1),
+                              concat([m10, m11, m12], dim=1),
+                              concat([m20, m21, m22], dim=1)], dim=1)
+
+    return rotation_matrix
+
 
 class Rotation:
     """
@@ -183,7 +201,12 @@ if __name__ == '__main__':
            0.0526372,  0.9974220, -0.0487703,
           -0.0747667,  0.0526372,  0.9958109 ]
 
-    mat3 = np.array(rot).reshape(3,3)
-    rot = Rotation.from_mat3(mat3)    
-    inv_rot = rot.inverse()
-    print(rot.dot(inv_rot).mat())
+    quat = [ 0.0563389, 0.0845084, 0.1408473, 0.9848078 ]
+    quat = np.ndarray(quat)
+    rot = quat_to_SO3(quat,is_xyzw=True)
+    print(rot)
+    #mat3 = np.array(rot).reshape(3,3)
+    #rot = Rotation.from_mat3(mat3)
+
+    #inv_rot = rot.inverse()
+    #print(rot.dot(inv_rot).mat())

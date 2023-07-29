@@ -88,7 +88,10 @@ class Pose:
         last = np.array([0., 0., 0., 1.]).reshape(1,4)
         if is_tensor(mat34): last = convert_tensor(last,mat34)        
         return concat([mat34, last], 0)
-                
+    
+    def se3(self):
+        
+
     def skew_t(self):
         t = self.t
         wx = t[0,0]

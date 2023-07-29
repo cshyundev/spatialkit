@@ -6,6 +6,7 @@ import os.path as osp
 import tifffile
 import skimage.io as skio
 import json
+import yaml
 from PIL import Image
 
 def read_float(path: str) -> np.ndarray:
@@ -62,6 +63,11 @@ def read_json(path: str) -> Dict[str,Any]:
         return json_dict 
     except:
         raise Exception("Reading json file Failed.")
+
+def read_yaml(path:str) -> Dict[str, Any]:
+    with open(path,"r") as f:
+        dict = yaml.load(f)
+    return dict
 
 if __name__ == '__main__':
     dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"
