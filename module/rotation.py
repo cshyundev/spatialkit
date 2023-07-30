@@ -1,9 +1,8 @@
 import numpy as np
-from module.hybrid_operations import *
-from scipy.linalg import expm
+from hybrid_operations import *
+from hybrid_math import *
 from scipy.spatial.transform import Rotation as R
-import os
-import sys
+
 # print(os.path.dirname(os.path.abspath(__file__)))
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -49,25 +48,6 @@ def is_quat(x: Array) -> bool:
     # [4] or [n,4]
     return shape[-1] == 4
 
-def exponential_map(mat: Array) -> Array:
-    if is_tensor(mat):
-        return torch.matrix_exp(mat)
-    else:
-        return expm(mat)
-
-def skew(x: Array) -> Array:
-    rx = x[0].item()
-    ry = x[1].item()
-    rz = x[2].item()
-    
-    skew_x = np.array([
-        [0, -rz,  ry],
-        [rz, 0., -rx],
-        [-ry, rx, 0.]
-    ])
-    if is_tensor(x): skew_x = convert_tensor(skew_x,x)
-    return skew_x
-
 def so3_to_SO3(so3: Array) -> Array:
     """
         Transform so3 to Rotation Matrix(SO3)
@@ -77,9 +57,10 @@ def so3_to_SO3(so3: Array) -> Array:
             Mat:(3,3), float, Rotation Matrix
     """
     assert is_so3(so3) and len(so3.shape) == 1, (f"Invaild Shape. so3 must be (3), but got {str(so3.shape)}")
-    
-    skew_so3 = skew(so3)
-    return exponential_map(skew_so3)
+    theta = sqrt(so3[0]**2 + so3[1]**2 + so3[2]**2)
+    vec = so3 / theta 
+    skew_vec = vec3_to_skew(vec)
+    return exponential_map(skew_vec*theta)
 
 def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     """
@@ -93,28 +74,34 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     if is_xyzw: # real part last
         x, y, z, w = quat[0],quat[1],quat[2],quat[3] 
     else:
-        w, x, y, z = quat[0], quat[1],quat[2],quat[3] 
+        w, x, y, z = quat[0],quat[1],quat[2],quat[3] 
 
     # Compute the elements of the rotation matrix
     m00 = 1 - 2 * (y**2 + z**2)
-    m01 = 2 * (x * y - z * w)
-    m02 = 2 * (x * z + y * w)
+    m01 = 2 * (x * y + z * w)
+    m02 = 2 * (x * z - y * w)
     
-    m10 = 2 * (x * y + z * w)
+    m10 = 2 * (x * y - z * w)
     m11 = 1 - 2 * (x**2 + z**2)
-    m12 = 2 * (y * z - x * w)
-    
-    m20 = 2 * (x * z - y * w)
-    m21 = 2 * (y * z + x * w)
+    m12 = 2 * (y * z + x * w)
+
+    m20 = 2 * (x * z + y * w)
+    m21 = 2 * (y * z - x * w)
     m22 = 1 - 2 * (x**2 + y**2)
     
     # Create the rotation matrices for each quaternion
-    rotation_matrix = concat([concat([m00, m01, m02], dim=1),
-                              concat([m10, m11, m12], dim=1),
-                              concat([m20, m21, m22], dim=1)], dim=1)
+    rotation_matrix = stack([stack([m00, m01, m02], dim=0),
+                              stack([m10, m11, m12], dim=0),
+                              stack([m20, m21, m22], dim=0)], dim=1)
 
     return rotation_matrix
 
+def SO3_to_so3(SO3: Array) -> Array:
+    assert(is_SO3(SO3)), (f"Invaild Shape. SO3 must be (3,3), but got {str(so3.shape)}")
+    
+    theta = arcos((trace(SO3) - 1.)*0.5)
+    vec = 0.5 / sin(theta) * stack([SO3[2,1]-SO3[1,2],SO3[0,2] - SO3[2,0],SO3[1,0] - SO3[0,1]], 0)   
+    return theta * vec
 
 class Rotation:
     """
@@ -173,6 +160,9 @@ class Rotation:
     def mat(self):
         return self.data
     
+    def so3(self):
+        return SO3_to_so3(self.data)  
+    
     def apply_pts3d(self, pts3d: Array):
         ## R*pt3d: [3,3] * [n,3]
         mat = self.mat()
@@ -197,16 +187,10 @@ class Rotation:
         return Rotation.from_mat3(rot_mat)
     
 if __name__ == '__main__':
-    rot = [  0.9958109, -0.0487703,  0.0773446,
-           0.0526372,  0.9974220, -0.0487703,
-          -0.0747667,  0.0526372,  0.9958109 ]
-
-    quat = [ 0.0563389, 0.0845084, 0.1408473, 0.9848078 ]
-    quat = np.ndarray(quat)
-    rot = quat_to_SO3(quat,is_xyzw=True)
-    print(rot)
-    #mat3 = np.array(rot).reshape(3,3)
-    #rot = Rotation.from_mat3(mat3)
-
-    #inv_rot = rot.inverse()
-    #print(rot.dot(inv_rot).mat())
+    # quat = [ -0.3294829, -0.5999728, 0.4375737, 0.5830977 ]
+    mat = [[-0.1028762, -0.1149348, -0.9880316],
+         [0.9056579,  0.3999406, -0.1408231],
+         [0.4113394, -0.9093060,  0.0629473]]
+    # rot_vec = [ -0.7691645, -1.4006122, 1.0214981]
+    mat = np.array(mat)
+    print(SO3_to_so3(mat))

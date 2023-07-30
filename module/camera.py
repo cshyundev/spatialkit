@@ -1,9 +1,8 @@
 import numpy as np
-from module.hybrid_operations import *
+from hybrid_operations import *
+from hybrid_math import *
 from enum import Enum
 from typing import *
-from module.hybrid_operations import Array
-
 
 class CamType(Enum):
     PINHOLE = ("PINHOLE", "Pinhole Camera Type")
@@ -18,11 +17,11 @@ class CamType(Enum):
             return CamType.OPENCV_FISHEYE
         else:
             return CamType.NONE
+        
 class Camera:
     def __init__(self, cam_dict: Dict[str, Any]):
         self.cam_type = CamType.NONE
-        self.width = cam_dict['width']
-        self.height = cam_dict['height']
+        self.height, self.width = cam_dict['image_size']
     
     def make_pixel_grid(self) -> np.ndarray:
         u, v = np.meshgrid(range(self.width), range(self.height))
@@ -55,16 +54,12 @@ class PinholeCamera(Camera):
     """
     def __init__(self, cam_dict: Dict[str, Any]):
         super(PinholeCamera, self).__init__(cam_dict)
-        
         self.cam_type = CamType.PINHOLE
-        
-        self.fx = cam_dict['fx']
-        self.fy = cam_dict['fy']        
-        self.cx = cam_dict['cx'] 
-        self.cy = cam_dict['cy']
+        self.fx,self.fy = cam_dict['focal_length']
+        self.cx,self.cy = cam_dict['principal_point'] 
         self.skew = cam_dict['skew']
-        self.radial_params = cam_dict['k'] # radial distortion parameters [k1,k2,k3]
-        self.tangential_params = cam_dict['p'] # tangential distortion parameters, [p1,p2]
+        self.radial_params = cam_dict['radial'] # radial distortion parameters [k1,k2,k3]
+        self.tangential_params = cam_dict['tangential'] # tangential distortion parameters, [p1,p2]
     
     def K(self):
         K = np.eye(3)
@@ -164,21 +159,29 @@ class PinholeCamera(Camera):
                  norm:bool = False,
                  err_thr:float = 1e-6,
                  max_iter:int = 5
-                 uv: np.ndarray=None, 
-                 norm: bool=False,
-                 err_thr: float = 1e-6,
-                 max_iter:int = 10
                  ) -> np.ndarray:
         if uv is None: uv = self.make_pixel_grid() # (HW,2)
         x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
         y = (uv[:,1:2] - self.cy) / self.fy
-        if self.radial_params is not None:
+        if self.radial_params[0] != 0.:
             x,y = self._undistort(x,y,err_thr, max_iter)
         z = ones_like(x)
         rays = concat([x,y,z], -1)
         if norm: rays = normalize(rays, -1)
         return rays # (HW,3)
     
+    def project(self, rays: Array) -> Array:
+        X = rays[:,0:1]
+        Y = rays[:,1:2]
+        Z = rays[:,2:3]
+        x,y = X / Z, Y / Z
+        if self.radial_params[0] != 0.:
+            x,y = self._distort(x,y)
+        u = self.fx * x + self.skew * y + self.cx 
+        v = self.fy * y + self.cy
+        return concat([u,v], dim=1)
+
+# TODO
 class OpenCVFIsheyeCamera(Camera):
     def __init__(self, cam_dict: Dict[str, Any]):
         super(OpenCVFIsheyeCamera, self).__init__(cam_dict)
@@ -209,17 +212,34 @@ class OpenCVFIsheyeCamera(Camera):
 if __name__ == '__main__':
     
     cam_dict = {
-        'cam_type': 'PINHOLE',
-        'width': 640,
-        'height': 480,
-        'fx': 160.,
-        'fy': 240.,
-        'cx': 320.,
-        'cy': 240.,
-        'skew': 1.4
-    }    
+    "cam_type": "PINHOLE",
+    "image_size": [
+     384,
+     384
+    ],
+    "focal_length": [
+     600.0,
+     599.9999389648438
+    ],
+    "principal_point": [
+     599.5,
+     339.4999694824219
+    ],
+    "skew": 1.7359692719765007e-05,
+    "radial": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "tangential": [
+     0.0,
+     0.0
+    ]
+   }
     cam = Camera.create_cam(cam_dict)
-    rays =cam.get_rays() 
-    print(rays.shape)
+    pt = np.array([[233.,253.]])
+    rays =cam.get_rays(pt)
+    uv = cam.project(rays)
+    print(uv)
     
     

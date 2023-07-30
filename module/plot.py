@@ -1,4 +1,5 @@
-from module.hybrid_operations import *
+from hybrid_operations import *
+from hybrid_math import *
 import matplotlib.pyplot as plt
 import cv2 as cv
 
@@ -44,18 +45,27 @@ def draw_line_by_line(image:np.ndarray, line: Tuple[float,float,float],
         thickness: scalar, int, thickness of the line
     """
     if rgb is None: rgb = tuple(np.random.randint(0,255,3).tolist())
-    _,w = image.shape[:2]
-    x0,y0 = map(int, [0, -line[2]/line[1] ])
-    x1,y1 = map(int, [w, -(line[2]+line[0]*w)/line[1]])
+    h,w = image.shape[:2]
+    if line[1] == 0.:
+        # ax +0y + c = 0
+        x0 = x1 = int(-line[2] / line[0])
+        y0 = 0
+        y1 = h
+    else:
+        x0,y0 = map(int, [0, -line[2]/line[1] ])
+        x1,y1 = map(int, [w, -(line[2]+line[0]*w)/line[1]])
     return cv.line(image,(x0,y0), (x1,y1), rgb, thickness)
     
 def show_image(image:np.ndarray):
     plt.imshow(image)
+    plt.show()
 
 if __name__ == "__main__":
-    
-    image = np.ones(640*480) * 255
-    image = image.reshape(640,480)
-    
-    pt2d = [(380,290)]
-    image = draw_circle(image, pt2d, 2)
+    from file_utils import read_image    
+    image = read_image("/home/sehyun/workspace/computer_vision_python/replica/scan1/000000_rgb.png")
+    pt1 = (246,110)
+    pt2 = (134,222)
+    line = (1.,-2.,0.)
+    # image = draw_line_by_points(image,pt1,pt2)
+    image = draw_line_by_line(image, line)
+    show_image(image)

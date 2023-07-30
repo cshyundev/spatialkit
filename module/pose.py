@@ -1,6 +1,18 @@
 import numpy as np
-from module.rotation import Rotation
-from module.hybrid_operations import *
+from rotation import Rotation, SO3_to_so3
+from hybrid_operations import *
+from hybrid_math import *
+
+
+
+def SE3_to_se3(SE3: Array) -> Array:
+    # covert SE3(matrix) to se3(so3,R^3)
+    R = SE3[:3,:3]
+    t = SE3[3,:]
+    so3 = SO3_to_so3(R)    
+    se3 = stack([so3, t], dim=0)
+    return se3
+
 
 class Pose:
     """
@@ -53,14 +65,13 @@ class Pose:
         return origin, direction        
     
     @staticmethod
-    def from_se3(se3: Array) -> 'Pose':
-        # assert(is_array(se3)), 'se3 must be Array type(Tensor or Numpy)'
-        # assert(se3.shape[-1] == 6), 'Invalid Shape. se3 must be (n,6) or (6)'
-        
-        # if len(se3.shape) == 1: # (6)
-        #     se3 = expand_dim(se3,0) # (1,6)
-        # return Pose(tr, rot)
-        raise NotImplementedError
+    def from_rot_vec_t(rot_vec: Array, t:Array) -> 'Pose':
+        assert(is_array(rot_vec)), 'rotation vector must be Array type(Tensor or Numpy)'
+        assert(is_array(t)), 'translation vector must be Array type(Tensor or Numpy)'
+        assert(rot_vec.shape[-1] == 3), 'Invalid Shape. rotation vector must be (3,)'
+        assert(rot_vec.shape[-1] == 3), 'Invalid Shape. translation vector must be (3,)'
+        rot = Rotation.from_so3(rot_vec)
+        return Pose(t,rot)
 
     @staticmethod
     def from_mat(mat4: Array) -> 'Pose':
@@ -72,9 +83,6 @@ class Pose:
     def from_dict(dict: Dict[str, Any]) -> 'Pose':
         assert hasattr(dict, 'camtoworld'), ("No Value Error. There is no Cam to World Transform in Dict.")
         mat = np.array(dict['camtoworld']) 
-    
-        if mat.shape == (3,4):
-            mat = concat([mat, np.array([0.,0.,0.,1.])], 1)
         return Pose.from_mat(mat)        
     
     def rot_mat(self):
@@ -89,46 +97,60 @@ class Pose:
         if is_tensor(mat34): last = convert_tensor(last,mat34)        
         return concat([mat34, last], 0)
     
-    def se3(self):
+    def rot_vec_t(self):
+        return self.rot.so3(), self.t
         
-
     def skew_t(self):
-        t = self.t
-        wx = t[0,0]
-        wy = t[0,1]
-        wz = t[0,2]
-        skew_t = np.array([[0., -wz, wy],
-                           [wz,  0, -wx],
-                           [-wy, wx,  0]])
-        if is_tensor(t): skew_t = convert_tensor(skew_t,t)
-        return skew_t
+        return vec3_to_skew(self.t)
     
     def get_t_rot_mat(self):
         return self.t, self.rot_mat()
     
     def inverse(self):
-        R_inv = Rotation.from_mat3(self.rot.inverse_mat()) 
+        R_inv = self.rot.inverse()
         t_inv = -R_inv.apply_pts3d(self.t)
         return Pose(t_inv, R_inv)
 
-    def merge(self, pose:'Pose') -> 'Pose':    
+    def merge(self, pose:'Pose') -> 'Pose':
+        """
+        |R t||R' t'| = |RR' Rt' + t|
+        |0 1||0  1 |   |0       1  |
+        """   
         rot = pose.rot.dot(self.rot)
-        t = pose.rot.apply_pts3d(self.t) + pose.t
+        t = self.rot.apply_pts3d(pose.t) + self.t
         return Pose(t, rot)
+    
+    def apply_pts3d(self, pts3d: Array) -> Array:
+        # P' = R@P + t
+        p = self.rot.apply_pts3d(pts3d)
+        if is_tensor(pts3d): return p + convert_tensor(self.t, pts3d)
+        return p + convert_numpy(self.t) 
     
     
 if __name__ == '__main__':
     rot = [  0.9958109, -0.0487703,  0.0773446,
            0.0526372,  0.9974220, -0.0487703,
           -0.0747667,  0.0526372,  0.9958109 ]
-    rot = Rotation.from_mat3(np.array(rot).reshape(3,3))     
-    t = np.array([1.,2.,3.])
-    w = Pose(t,rot)
-    print(w.mat34())
-    inv_w = w.inverse() 
-    print(inv_w.mat34())
-    I = w.merge(inv_w)
-    print(I.mat34())
+    rot = Rotation.from_mat3(np.array(rot).reshape(3,3))
+    t1 = np.array([1.,2.,3.])
+    t2 = np.array([2.,3.,4.])
+    
+    # cam1tow = Pose(t1,rot) # cam1 to world
+    # cam2tow = Pose(t2,rot) # cam2 to world
+    # rel = cam2tow.inverse().merge(cam1tow) # cam1 to cam2
+    # print(rel.mat34())
+    # cam1tow_mat = cam1tow.mat44()
+    # wtocam2_mat = cam2tow.inverse().mat44()
+    # rel_mat = wtocam2_mat@cam1tow_mat 
+    # print(rel_mat)
+    p = Pose(t1,rot)
+    skew_t = p.skew_t()
+    print(vec3_to_skew(t1))
+    # print(skew_t)
+    
+
+
+
     
     
     

@@ -1,2 +1,5 @@
 test.p.y
 /replica
+*.json
+*.yaml
+*.png

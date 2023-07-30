@@ -1,6 +1,6 @@
 import numpy as np
 from typing import *
-from module.hybrid_operations import *
+from hybrid_operations import *
 import os
 import os.path as osp
 import tifffile
@@ -64,10 +64,26 @@ def read_json(path: str) -> Dict[str,Any]:
     except:
         raise Exception("Reading json file Failed.")
 
+def write_json(path:str, dict:Dict[str,Any], indent:int=1):
+    try:
+        with open(path,"w") as f:
+            json.dump(dict,f, indent=indent)
+    except:
+        raise Exception("Writing json file Failed.")
+
 def read_yaml(path:str) -> Dict[str, Any]:
-    with open(path,"r") as f:
-        dict = yaml.load(f)
-    return dict
+    try:
+        with open(path,"r") as f:
+            dict = yaml.load(f)
+        return dict
+    except:
+        raise Exception("Reading yaml file Failed.")
+
+
+def write_yaml(path:str, dict:Dict[str,Any]):
+    with open(path,"w") as f:
+        yaml.dump(dict,f)
+
 
 if __name__ == '__main__':
     dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"

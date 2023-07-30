@@ -50,9 +50,18 @@ def expand_dim(x: Array, dim: int) -> Array:
     if is_tensor(x): return x.unsqueeze(dim)
     else: return np.expand_dims(x, axis=dim)
 
+def reduce_dim(x: Array, dim: int) -> Array:
+    if is_tensor(x): return x.squeeze(dim)
+    else: return np.squeeze(x, axis=dim)
+
 def concat(x: List[Array], dim: int) -> Array:
      if is_tensor(x[0]): return torch.cat(x, dim=dim)
      return np.concatenate(x, axis=dim)
+
+def stack(x: List[Array], dim:int) -> Array:
+     if is_tensor(x[0]): return torch.stack(x, dim=dim)
+     return np.stack(x, axis=dim)
+
 
 def ones_like(x: Array) -> Array:
     assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")
@@ -71,22 +80,7 @@ def where(condition:Array, x:Array, y:Array) -> Array:
     if is_tensor(condition): return torch.where(condition,x,y)
     return np.where(condition,x,y)    
 
-def abs(x:Array) -> Array:
-    if is_tensor(x): torch.abs(x)
-    return np.abs(x)
-
-def sqrt(x: Array) -> Array:
-    if is_tensor(x): return torch.sqrt(x)
-    return np.sqrt(x)
-
-def sqrt(x: Array) -> Array:
-    if is_tensor(x): return torch.sqrt(x)
-    return np.sqrt(x)
-
 if __name__ == '__main__':
     x = np.array(range(30)).reshape(2,3,5)
-    # print(permute(x,(1,2)).shape)
-    # x = torch.tensor(x)
-    sqrt_x = sqrt(x)
     
     
