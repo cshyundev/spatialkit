@@ -41,7 +41,7 @@ def convert_numpy(x: Array) -> ndarray:
     else: raise TypeError
     return x_numpy
 
-def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor) -> Dict[Any,Tensor]:
+def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor=None) -> Dict[Any,Tensor]:
     for key in dict.keys():
         if is_numpy(dict[key]): dict[key] = convert_tensor(dict[key], tensor)
     return dict

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import *
-from hybrid_operations import *
+from .hybrid_operations import *
 import os
 import os.path as osp
 import tifffile

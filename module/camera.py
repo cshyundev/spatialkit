@@ -1,6 +1,6 @@
 import numpy as np
-from hybrid_operations import *
-from hybrid_math import *
+from .hybrid_operations import *
+from .hybrid_math import *
 from enum import Enum
 from typing import *
 

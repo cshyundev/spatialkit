@@ -1,7 +1,7 @@
 import numpy as np
-from rotation import Rotation, SO3_to_so3
-from hybrid_operations import *
-from hybrid_math import *
+from .rotation import Rotation, SO3_to_so3
+from .hybrid_operations import *
+from .hybrid_math import *
 
 
 

@@ -1,6 +1,6 @@
 import numpy as np
-from hybrid_operations import *
-from hybrid_math import *
+from .hybrid_operations import *
+from .hybrid_math import *
 from scipy.spatial.transform import Rotation as R
 
 # print(os.path.dirname(os.path.abspath(__file__)))
