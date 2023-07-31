@@ -103,6 +103,41 @@ def SO3_to_so3(SO3: Array) -> Array:
     vec = 0.5 / sin(theta) * stack([SO3[2,1]-SO3[1,2],SO3[0,2] - SO3[2,0],SO3[1,0] - SO3[0,1]], 0)   
     return theta * vec
 
+def SO3_to_quat(SO3: Array) -> Array:
+     # Extract the elements of the rotation matrix
+    r11, r12, r13 = SO3[0, 0], SO3[0, 1], SO3[0, 2]
+    r21, r22, r23 = SO3[1, 0], SO3[1, 1], SO3[1, 2]
+    r31, r32, r33 = SO3[2, 0], SO3[2, 1], SO3[2, 2]
+
+    # Calculate the quaternion components
+    trace = r11 + r22 + r33
+    if trace > 0:
+        S = sqrt(trace + 1.0) * 2
+        w = 0.25 * S
+        x = (r32 - r23) / S
+        y = (r13 - r31) / S
+        z = (r21 - r12) / S
+    elif (r11 > r22) and (r11 > r33):
+        S = sqrt(1.0 + r11 - r22 - r33) * 2
+        w = (r32 - r23) / S
+        x = 0.25 * S
+        y = (r12 + r21) / S
+        z = (r13 + r31) / S
+    elif r22 > r33:
+        S = sqrt(1.0 + r22 - r11 - r33) * 2
+        w = (r13 - r31) / S
+        x = (r12 + r21) / S
+        y = 0.25 * S
+        z = (r23 + r32) / S
+    else:
+        S = sqrt(1.0 + r33 - r11 - r22) * 2
+        w = (r21 - r12) / S
+        x = (r13 + r31) / S
+        y = (r23 + r32) / S
+        z = 0.25 * S
+
+    return np.array([w, x, y, z])
+
 class Rotation:
     """
     Rotation Class. This can be recieved one of types [SO3, so3, quat].
@@ -162,6 +197,9 @@ class Rotation:
     
     def so3(self):
         return SO3_to_so3(self.data)  
+    
+    def quat(self):
+        return SO3_to_quat(self.data)
     
     def apply_pts3d(self, pts3d: Array):
         ## R*pt3d: [3,3] * [n,3]

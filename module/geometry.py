@@ -101,7 +101,7 @@ class MultiView:
             cameras.append(Camera.create_cam(frame["cam"]))
             poses.append(Pose.from_mat(np.array(frame["camtoworld"])))
             image_path.append(osp.join(root,frame["image"]))
-            depth_path.append(osp.join(root,frame["depth"]))
+            depth_path.append(osp.join(root,frame["dump_depth"]))
             normal_path.append(osp.join(root,frame["normal"]))
         return MultiView(image_path,cameras,poses,depth_path,normal_path)
 
@@ -182,83 +182,26 @@ class MultiView:
             depth = read_float(self.depth_path[i]).reshape(-1,1)
             pts3d_w = origin + depth * direction            
             pts3d.append(pts3d_w)
-            
-            color = read_image(self.image_path[i])            
+            color = read_image(self.image_path[i]).reshape(-1,3) / 255.            
             colors.append(color)
-        
-        pt3d = concat(pt3d, 0)
+        pts3d = concat(pts3d, 0)
         colors = concat(colors, 0)            
         
-        make_point_cloud(pt3d, colors, save_path)
+        make_point_cloud(pts3d, colors, save_path)
     
     def get_image(self, idx:int) -> np.ndarray:
         return read_image(self.image_path[idx])
     
 if __name__ == '__main__':
-    path = "/home/sehyun/workspace/computer_vision_python/test.json"
-    dict = read_json(path)
+    path = "/home/sehyun/nerf-project/dataset/monosdf_replica.json"
+    dict = read_json(path)    
     """
         replica: file_index 0, 3
         index 0: (246,110),(134,222),(337,29),(99,132),(322,105),(276,137),(188,163),(368,62)
         index 1: (209,109),(89,298),(279,27),(59,198),(279,192),(239,223),(155,254),(311,153)
     """
-    left_2d = [(246,110),(134,222),(337,29),(99,132) ,(322,105),(276,137),(188,163),(368,62)]
-    right_2d = [(209,198),(89,298),(279,127),(59,198) ,(279,192),(239,223),(155,254),(311,153)]
-
     multiview = MultiView.from_dict(dict)
-    F = [[-9.28020692e-06, -2.45488646e-05, -3.20600175e-02],
-        [ 8.39367181e-05, -1.18306184e-05, -1.15353286e-02],
-        [ 2.04137919e-02,  7.44656921e-05,  1.00000000e+00]]
-    E =[[ 0.52659781,  1.39300528,  6.45539981],
-        [-4.76292092  ,0.67131866 ,-0.38329528],
-        [-5.81583537  ,1.15559207  ,1.        ]]
-    F = np.array(F)
-    K1 = multiview.cameras[0].K()
-    K2 = multiview.cameras[3].K()
-    E = (K2.T)@F@K1
-    E = E / E[2,2] 
-    F = multiview.fundamental_matrix(0,3)
-    # F = F / F[2,2]
-    E_ = multiview.essential_matrix(0,3)
-    print(E_ / E_[2,2])
-    print(E)
-    left = multiview.get_image(0)
-    right = multiview.get_image(3)
-    for pt1,pt2 in zip(left_2d,right_2d):
-            pt_homo = np.array([pt1[0], pt1[1], 1.])
-            color = tuple(np.random.randint(0,255,3).tolist())
-            left = draw_circle(left, pt1, 1,color,2)
-            right = draw_circle(right, pt2, 1,color,2)            
-            right = draw_line_by_line(right,tuple((F@pt_homo).tolist()), color, 2)            
-                     
-    image = concat_images([left,right], vertical=False)
-    show_image(image)
-
-    # rel = multiview.relative_pose(0,3)
-    # left_ray = multiview.cameras[0].get_rays(np.array([[246.,110.]]))
-    # rel_right_ray = rel.apply_pts3d(left_ray)
-    # right_ray = multiview.cameras[3].get_rays(np.array([[209,109]]))
-    # print(rel_right_ray)
-    # print(right_ray)
-    # print(multiview.cameras[3].project(rel.apply_pts3d(left_ray)))
-    # print(multiview.cameras[3].project(right_ray))
+    multiview.save_point_cloud("./point_cloud.ply")
     
-
-    # F_cv, mask = cv.findFundamentalMat(np.int32(left_2d),np.int32(right_2d),cv.FM_8POINT)
-    # print("F:", F)
-    # print("F_cv:", F_cv)
-    # F = multiview.fundamental_matrix(0,3)
-    # F = F / F[2,2]
-    # print(F)
-    # for left, right in zip(left_2d,right_2d):
-    #     left_homo = np.array([left[0],left[1],1.])
-    #     right_homo = np.array([right[0],right[1],1.]).T
-    #     print(right_homo@F@left_homo)
-
-    # pts2d = multiview.choice_points(0,3,3)
-    # epipole_image = multiview.draw_epipolar_line(0,3,pts2d)
-    # # print(multiview.fundamental_matrix(0,3))
-    # cv.imshow("epipolar_image", epipole_image)
-    # cv.waitKey(0)
-    # write_image(epipole_image, "epipolar_image.png")
+    
     

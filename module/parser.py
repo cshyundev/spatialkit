@@ -91,7 +91,8 @@ def parse_monosdf_dataset(dataset_path:str,
             "timestamp": 0.,
             "image": f"{frame_id:06d}_rgb.png",
             "depth": f"{frame_id:06d}_depth.npy",
-            "normal": f"{frame_id:06d}_normal.npy"
+            "normal": f"{frame_id:06d}_normal.npy",
+            "dump_depth": f"dump_depth_{frame_id:06d}.npy" # for debug
         }
         frames.append(frame)
 
@@ -100,6 +101,6 @@ def parse_monosdf_dataset(dataset_path:str,
     return dataset_dict
 
 if __name__ == "__main__":
-    replica_path = "/home/sehyun/workspace/computer_vision_python/replica/scan1"
+    replica_path = "/home/sehyun/replica/scan1"
     dict = parse_monosdf_dataset(replica_path, "center_crop_for_replica","PINHOLE", 1.)
-    write_json("./test.json", dict)
+    write_json("/home/sehyun/nerf-project/dataset/monosdf_replica.json", dict)
