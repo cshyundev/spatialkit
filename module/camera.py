@@ -37,6 +37,9 @@ class Camera:
     def depth_scale(self) -> Array:
         return 1.
     
+    def get_radii(self) -> Array:
+        raise NotImplementedError
+    
     @staticmethod
     def create_cam(cam_dict: Dict[str, Any]) -> 'Camera':
         cam_type = CamType.from_string(cam_dict['cam_type']) 
@@ -180,6 +183,23 @@ class PinholeCamera(Camera):
         u = self.fx * x + self.skew * y + self.cx 
         v = self.fy * y + self.cy
         return concat([u,v], dim=1)
+
+    def get_radii(self, err_thr:float = 1e-6, max_iter:int = 5):
+        uv = self.make_pixel_grid()
+        x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
+        y = (uv[:,1:2] - self.cy) / self.fy
+        if self.radial_params[0] != 0.:
+            x,y = self._undistort(x,y,err_thr, max_iter)
+        dx = x[:,:-1] - x[:,1:]
+        dx = concat([dx, dx[:,-2:-1]])
+        dy = y[:,:-1] - y[:,1:]
+        dy = concat([dy, dy[:,-2:-1]])
+        radii = sqrt(dx**2 + dy**2) / np.sqrt(12)
+
+        return radii
+
+
+
 
 # TODO
 class OpenCVFIsheyeCamera(Camera):
