@@ -80,6 +80,8 @@ def where(condition:Array, x:Array, y:Array) -> Array:
     if is_tensor(condition): return torch.where(condition,x,y)
     return np.where(condition,x,y)    
 
+# def pad(x:Array, )
+
 if __name__ == '__main__':
     x = np.array(range(30)).reshape(2,3,5)
     

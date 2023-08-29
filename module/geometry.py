@@ -1,9 +1,10 @@
 import numpy as np
-from hybrid_operations import *
-from pose import Pose
-from camera import *
-from file_utils import *
-from plot import * 
+
+from module.hybrid_operations import *
+from module.pose import Pose
+from module.camera import *
+from module.file_utils import *
+from module.plot import * 
 import open3d as o3d 
 from typing import *
 import os.path as osp
@@ -28,6 +29,54 @@ def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=Non
         mesh.vertex_colors = convert_numpy(vertex_colors)
     if save_path: o3d.io.write_triangle_mesh(save_path, mesh)
     return mesh
+
+def compute_depth_to_normal(depth:np.ndarray, rays:np.ndarray, window_size:int=3) -> np.ndarray:
+    """
+    Args:
+        depth: (H,W), depth map
+        rays: (H*W,3), camera ray  
+    Return:
+        normal: (H,W,3), normal map from depth map
+    """
+    height, width = depth.shape[0:2]
+    depth = expand_dim(depth,2)
+    rays = rays.reshape(height,width,3)
+    points = depth * rays # (H,W,3)
+    pad_size = window_size // 2
+    points = np.pad(points,((pad_size,pad_size),(pad_size,pad_size),(0,0)), mode='edge') # (H+pad*2,W+pad*2,3)
+    point_stack = []
+    for i in range(window_size):
+        for j in range(window_size):
+            point_stack.append(points[i:height+i,j:width+j,:])
+    point_stack = stack(point_stack, dim=3) # (H,W,3,window_size*window_size)
+    eigen_vector, _  = compute_pca(point_stack)
+    
+    
+def compute_pca(data):
+    H, W, _, N = data.shape
+
+    # 1. Reshape data
+    reshaped_data = data.transpose(2, 0, 1, 3).reshape(3, -1)
+
+    # 2. Center the data
+    mean = np.mean(reshaped_data, axis=1, keepdims=True)
+    centered_data = reshaped_data - mean
+
+    # 3. Compute the covariance matrix
+    cov_matrix = np.cov(centered_data)
+
+    # 4. Compute eigenvectors & eigenvalues of the covariance matrix
+    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+
+    # Sort eigenvalues & eigenvectors
+    sorted_indices = np.argsort(eigenvalues)[::-1]
+    sorted_eigenvectors = eigenvectors[:, sorted_indices]
+    sorted_eigenvalues = eigenvalues[sorted_indices]
+
+    return sorted_eigenvectors, sorted_eigenvalues
+    
+    
+    
 
 class MultiView:
     """
@@ -177,7 +226,7 @@ class MultiView:
         colors = []
         
         for i in range(self.n_views):
-            rays = self.cameras[i].get_rays() # [n,3]
+            rays = self.cameras[i].get_rays(norm=False) # [n,3]
             origin, direction = self.poses[i].get_origin_direction(rays) # [n,3], [n,3]
             depth = read_float(self.depth_path[i]).reshape(-1,1)
             pts3d_w = origin + depth * direction            
@@ -193,15 +242,9 @@ class MultiView:
         return read_image(self.image_path[idx])
     
 if __name__ == '__main__':
-    path = "/home/sehyun/nerf-project/dataset/monosdf_replica.json"
-    dict = read_json(path)    
-    """
-        replica: file_index 0, 3
-        index 0: (246,110),(134,222),(337,29),(99,132),(322,105),(276,137),(188,163),(368,62)
-        index 1: (209,109),(89,298),(279,27),(59,198),(279,192),(239,223),(155,254),(311,153)
-    """
-    multiview = MultiView.from_dict(dict)
-    multiview.save_point_cloud("./point_cloud.ply")
+    
+    array = np.arange(25*3, dtype=np.float32).reshape(5,5,3)
+    print(array)
     
     
     

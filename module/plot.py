@@ -1,5 +1,5 @@
-from hybrid_operations import *
-from hybrid_math import *
+from module.hybrid_operations import *
+from module.hybrid_math import *
 import matplotlib.pyplot as plt
 import cv2 as cv
 
@@ -14,9 +14,34 @@ def convert_image(image: Array) -> Array:
     if image.shape[0] == 3: # (3,H,W)
         image = permute(image, (2,0,1)) # (H,W,3)
     if image.dtype != np.uint8:
+        image = image * 255
         image = image.astype(np.uint8)
     return image
-        
+
+# convert depth to color image
+def depth_to_image(depth:Array,min_v:float=None,max_v:float=None, color_map:str='magma') -> np.ndarray:
+    if len(depth.shape) == 3: depth = reduce_dim(depth,dim=2)
+    depth = convert_numpy(depth)
+    if min_v is None: min_v = depth.min()
+    if max_v is None: max_v = depth.max()
+    depth = np.clip(depth,min_v,max_v)
+    normalized_depth = (depth - min_v) / (max_v -min_v)
+    color_mapped = plt.cm.get_cmap(color_map)(normalized_depth)
+    # remove alpha channel
+    color_mapped = (color_mapped[:, :, :3] * 255).astype(np.uint8)
+    return color_mapped
+
+# openGL coordinate mapping
+def normal_to_image(normal: Array) -> np.ndarray:
+    assert len(normal.shape) == 3 or normal.shape[-1] == 3
+
+    normal = convert_numpy(normal)
+    r = (normal[:,:,0] + 1) / 2.0 # (H,W,3)
+    g = (-normal[:,:,1] + 1) / 2.0
+    b = (-normal[:,:,2] + 1) / 2.0
+    color_mapped = convert_image(np.stack((r, g, b), -1)*255) 
+    return color_mapped
+
 def concat_images(images:List[Array], vertical:bool=False):
         concated_images = convert_image(images[0]) 
         for image in images[1:]:
@@ -61,11 +86,7 @@ def show_image(image:np.ndarray):
     plt.show()
 
 if __name__ == "__main__":
-    from file_utils import read_image    
-    image = read_image("/home/sehyun/workspace/computer_vision_python/replica/scan1/000000_rgb.png")
-    pt1 = (246,110)
-    pt2 = (134,222)
-    line = (1.,-2.,0.)
-    # image = draw_line_by_points(image,pt1,pt2)
-    image = draw_line_by_line(image, line)
-    show_image(image)
+    from file_utils import write_image
+    normal = np.random.rand(480,480,1)*100
+    color_normal = depth_to_image(normal)
+    write_image(color_normal, "/home/sehyun/normal.png")

@@ -24,7 +24,7 @@ class Camera:
         self.height, self.width = cam_dict['image_size']
     
     def make_pixel_grid(self) -> np.ndarray:
-        u, v = np.meshgrid(range(self.width), range(self.height))
+        u,v = np.meshgrid(range(self.width), range(self.height))
         uv = concat([u.reshape((-1, 1)), v.reshape((-1, 1))], 1)
         return uv 
     
@@ -190,10 +190,10 @@ class PinholeCamera(Camera):
         y = (uv[:,1:2] - self.cy) / self.fy
         if self.radial_params[0] != 0.:
             x,y = self._undistort(x,y,err_thr, max_iter)
-        dx = x[:,:-1] - x[:,1:]
-        dx = concat([dx, dx[:,-2:-1]])
-        dy = y[:,:-1] - y[:,1:]
-        dy = concat([dy, dy[:,-2:-1]])
+        dx = x[:-1,:] - x[1:,:]
+        dx = concat([dx, dx[-2:-1,:]], dim=0)
+        dy = y[:-1,:] - y[1:,:]
+        dy = concat([dy, dy[-2:-1,:]],dim=0)
         radii = sqrt(dx**2 + dy**2) / np.sqrt(12)
 
         return radii

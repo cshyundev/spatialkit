@@ -81,7 +81,7 @@ class Pose:
     
     @staticmethod
     def from_dict(dict: Dict[str, Any]) -> 'Pose':
-        assert hasattr(dict, 'camtoworld'), ("No Value Error. There is no Cam to World Transform in Dict.")
+        assert('camtoworld' in dict), ("No Value Error. There is no Cam to World Transform in Dict.")
         mat = np.array(dict['camtoworld']) 
         return Pose.from_mat(mat)        
     

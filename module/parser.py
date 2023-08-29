@@ -2,7 +2,7 @@ from glob import glob
 from typing import Dict, Any
 import os.path as osp
 import numpy as np
-from .file_utils import *
+from module.file_utils import *
 import cv2 as cv
 
 def parse_monosdf_dataset(dataset_path:str,
@@ -15,7 +15,6 @@ def parse_monosdf_dataset(dataset_path:str,
     dataset_dict = {}
 
     dataset_dict["root"] = dataset_path
-    dataset_dict["is_mono"] = True
     dataset_dict["margin"] = margin
     def glob_data(data_dir):
             data_paths = []
@@ -92,15 +91,20 @@ def parse_monosdf_dataset(dataset_path:str,
             "image": f"{frame_id:06d}_rgb.png",
             "depth": f"{frame_id:06d}_depth.npy",
             "normal": f"{frame_id:06d}_normal.npy",
-            "dump_depth": f"dump_depth_{frame_id:06d}.npy" # for debug
+            "dump_depth": f"{frame_id:06d}_pred_depth.npy" # for debug
         }
         frames.append(frame)
 
     dataset_dict["frames"] = frames
+    meta_data = read_json(osp.join(dataset_path,"meta_data.json"))
+    near = meta_data["scene_box"]["near"]
+    far = meta_data["scene_box"]["far"]
+
+    dataset_dict["near"] = near
+    dataset_dict["far"] = far
+    dataset_dict["inv_depth"] = False
 
     return dataset_dict
 
-if __name__ == "__main__":
-    replica_path = "/home/sehyun/replica/scan1"
-    dict = parse_monosdf_dataset(replica_path, "center_crop_for_replica","PINHOLE", 1.)
-    write_json("/home/sehyun/nerf-project/dataset/monosdf_replica.json", dict)
+# if __name__ == "__main__":
+    

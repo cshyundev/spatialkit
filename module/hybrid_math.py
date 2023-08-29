@@ -1,4 +1,4 @@
-from .hybrid_operations import *
+from module.hybrid_operations import *
 from scipy.linalg import expm, logm
 
 def norm_l2(x: Array, dim:int, keepdim:bool=True):

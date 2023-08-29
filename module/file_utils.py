@@ -1,10 +1,11 @@
 import numpy as np
 from typing import *
-from .hybrid_operations import *
+from module.hybrid_operations import *
 import os
 import os.path as osp
 import tifffile
 import skimage.io as skio
+from skimage import img_as_float32
 import json
 import yaml
 from PIL import Image
@@ -44,9 +45,12 @@ def write_float(image:Array, path:str):
         print("reading data failed.")
         data = None
     
-def read_image(path: str) -> np.ndarray:
+def read_image(path: str, as_float:bool=False) -> np.ndarray:
     try:
-        return skio.imread(path)
+        image = skio.imread(path)
+        if as_float:
+             image = img_as_float32(image) # normalize [0,255] -> [0.,1.]
+        return image 
     except Exception as e:
         print("reading image failed.")
         return None
