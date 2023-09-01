@@ -25,7 +25,7 @@ class Camera:
     
     def make_pixel_grid(self) -> np.ndarray:
         u,v = np.meshgrid(range(self.width), range(self.height))
-        uv = concat([u.reshape((-1, 1)), v.reshape((-1, 1))], 1)
+        uv = concat([u.reshape((1,-1)), v.reshape((1,-1))], 0)
         return uv 
     
     def get_rays(self) -> Array:
@@ -121,13 +121,13 @@ class PinholeCamera(Camera):
         https://github.com/google-research/multinerf/blob/b02228160d3179300c7d499dca28cb9ca3677f32/internal/camera_utils.py#L477-L509
             
         Args:
-            xd: (N,1), float, The distorted coordinates x.
-            yd: (N,1), float, The distorted coordinates y.
+            xd: (1,N), float, The distorted coordinates x.
+            yd: (1,N), float, The distorted coordinates y.
             err_thr: scalar, float, error threshold.
             max_iter: scalar, int, maximum iteration times.        
         Returns:
-            xu: (N,1), float, The undistorted coordinates x.
-            yu: (N,1), float, The undistorted coordinates y.
+            xu: (1,N), float, The undistorted coordinates x.
+            yu: (1,N), float, The undistorted coordinates y.
             
         We want to undistortion point like distortion == distort(undistortion)
         x,y := undistorted coords. x,y
@@ -163,43 +163,39 @@ class PinholeCamera(Camera):
                  err_thr:float = 1e-6,
                  max_iter:int = 5
                  ) -> np.ndarray:
-        if uv is None: uv = self.make_pixel_grid() # (HW,2)
-        x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
-        y = (uv[:,1:2] - self.cy) / self.fy
+        if uv is None: uv = self.make_pixel_grid() # (2,HW)
+        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
+        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
         if self.radial_params[0] != 0.:
             x,y = self._undistort(x,y,err_thr, max_iter)
         z = ones_like(x)
-        rays = concat([x,y,z], -1)
-        if norm: rays = normalize(rays, -1)
-        return rays # (HW,3)
+        rays = concat([x,y,z], 0) # (3,HW)
+        if norm: rays = normalize(rays, 0)
+        return rays # (3,HW)
     
     def project(self, rays: Array) -> Array:
-        X = rays[:,0:1]
-        Y = rays[:,1:2]
-        Z = rays[:,2:3]
+        X = rays[0:1,:]
+        Y = rays[1:2,:]
+        Z = rays[2:3,:]
         x,y = X / Z, Y / Z
         if self.radial_params[0] != 0.:
             x,y = self._distort(x,y)
         u = self.fx * x + self.skew * y + self.cx 
         v = self.fy * y + self.cy
-        return concat([u,v], dim=1)
+        return concat([u,v], dim=0) # (2,HW)
 
     def get_radii(self, err_thr:float = 1e-6, max_iter:int = 5):
         uv = self.make_pixel_grid()
-        x = (uv[:,0:1] - self.cx - self.skew / self.fy*(uv[:,1:2] -self.cy)) / self.fx
-        y = (uv[:,1:2] - self.cy) / self.fy
+        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
+        y = (uv[1:2,:] - self.cy) / self.fy # (1,HW)
         if self.radial_params[0] != 0.:
             x,y = self._undistort(x,y,err_thr, max_iter)
-        dx = x[:-1,:] - x[1:,:]
-        dx = concat([dx, dx[-2:-1,:]], dim=0)
-        dy = y[:-1,:] - y[1:,:]
-        dy = concat([dy, dy[-2:-1,:]],dim=0)
-        radii = sqrt(dx**2 + dy**2) / np.sqrt(12)
-
-        return radii
-
-
-
+        dx = x[:,:-1] - x[:,1:]
+        dx = concat([dx, dx[:,-2:-1]], dim=1)
+        dy = y[:,-1:] - y[:,1:]
+        dy = concat([dy, dy[:,-2:-1]],dim=1)
+        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
+        return radii.reshape(-1,1)
 
 # TODO
 class OpenCVFIsheyeCamera(Camera):

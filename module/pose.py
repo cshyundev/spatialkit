@@ -48,20 +48,20 @@ class Pose:
         """
         get camera origin and direction vectors from rays(camera coordinates)
         Args:
-            rays: (n,3), float, ray from camera origin
+            rays: (3,n), float, ray from camera origin
         Return:
             origin: (n,3), float, camera origin in world coord. origin = t
             direction: (n,3), float, direction vector in world coord. direction = R.T*rays
         """
-        assert len(rays.shape) <= 2 and rays.shape[-1] == 3, "Invalid Shape. Ray's shape must be (n,3) or (3)"
+        assert len(rays.shape) <= 2 and rays.shape[0] == 3, "Invalid Shape. Ray's shape must be (n,3) or (3)"
         if len(rays.shape) == 2:
-            n_rays = rays.shape[0]
+            n_rays = rays.shape[1]
         else:
-            rays = expand_dim(rays, 0)
+            rays = expand_dim(rays, 1)
             n_rays = 1
         origin = np.tile(self.t, (n_rays,1))
         if is_tensor(rays): origin = convert_tensor(origin, rays)
-        direction = self.rot.apply_pts3d(rays)
+        direction = transpose2d(self.rot.apply_pts3d(rays)).reshape((-1,3)) 
         return origin, direction        
     
     @staticmethod

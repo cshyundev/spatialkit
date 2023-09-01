@@ -231,7 +231,7 @@ class MultiView:
             depth = read_float(self.depth_path[i]).reshape(-1,1)
             pts3d_w = origin + depth * direction            
             pts3d.append(pts3d_w)
-            color = read_image(self.image_path[i]).reshape(-1,3) / 255.            
+            color = read_image(self.image_path[i],as_float=True).reshape(-1,3) # as_float:0~255 -> 0~1.          
             colors.append(color)
         pts3d = concat(pts3d, 0)
         colors = concat(colors, 0)            
