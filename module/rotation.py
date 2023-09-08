@@ -222,12 +222,38 @@ class Rotation:
         if is_tensor(rot1_mat): rot2_mat = convert_tensor(rot2_mat,rot1_mat)    
         rot_mat = matmul(rot1_mat,rot2_mat)
         return Rotation.from_mat3(rot_mat)
+
+
+def slerp(r1:Rotation,r2:Rotation, t:float):
+    """
+    Spherical Linear Interpolation between two Rotion
+    1. transfrom Rotations to unit quaternions q1,q2
+    2. compute angle "w" between two quaternions: w = cos^-1(q1*q2)
+    3. compute slerp(q1,q2,t) =  sin((1-t)*w)/sin(w)*q1 + sin(tw)/sin(w)*q2
+
+    Args:
+        r1: Rotation, rotation instance
+        r2: Rotation, rotation instance
+        t: float, interploation parameters, 0<=t<=1
+    Return:
+        slerp(q1,q2,t): Rotation
+    """
+    assert (t <=1. and t >= 0.), ("Interpolation parameters must be between 0 and 1.")
     
-if __name__ == '__main__':
-    # quat = [ -0.3294829, -0.5999728, 0.4375737, 0.5830977 ]
-    mat = [[-0.1028762, -0.1149348, -0.9880316],
-         [0.9056579,  0.3999406, -0.1408231],
-         [0.4113394, -0.9093060,  0.0629473]]
-    # rot_vec = [ -0.7691645, -1.4006122, 1.0214981]
-    mat = np.array(mat)
-    print(SO3_to_so3(mat))
+    if t == 1.: return r2
+    if t == 0.: return r1
+
+    q1,q2 = r1.quat(),r2.quat() # (w,x,y,z)
+    cos_omega = matmul(q1,q2)
+    if cos_omega < 0.: # If negative dot product, negate one of the quaternions to take shorter arc
+        q1 = -q1
+        cos_omega = -cos_omega
+    if cos_omega > 0.9999: # If the quaternions are very close, use linear interpolation
+        q = normalize(q1*(1-t) + q2*t,dim=0)
+    else:
+        omega = arcos(cos_omega)
+        sin_omega = sin(omega)
+        scale1 = sin((1-t)*omega) / sin_omega
+        scale2 = sin(t*omega) / sin_omega
+        q = normalize(scale1*q1 + scale2*q2,dim=0)
+    return Rotation.from_quat_wxyz(q)  

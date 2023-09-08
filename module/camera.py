@@ -7,6 +7,7 @@ from typing import *
 class CamType(Enum):
     PINHOLE = ("PINHOLE", "Pinhole Camera Type")
     OPENCV_FISHEYE = ("OPENCV_FISHEYE", "OpenCV Fisheye Camera with Distortion Parameters")
+    EQUIRECT = ("EQUIRECT", "Equirectangular Camera Type")
     NONE = ("NONE", "No Camera Type")
     
     @staticmethod
@@ -159,7 +160,8 @@ class PinholeCamera(Camera):
             
     def get_rays(self,
                  uv:np.ndarray = None, 
-                 norm:bool = False,
+                 norm:bool = True,
+                 out_scale:bool = False,
                  err_thr:float = 1e-6,
                  max_iter:int = 5
                  ) -> np.ndarray:
@@ -171,6 +173,9 @@ class PinholeCamera(Camera):
         z = ones_like(x)
         rays = concat([x,y,z], 0) # (3,HW)
         if norm: rays = normalize(rays, 0)
+        if out_scale:
+            depth_scale = 1. / rays[2:3,:]
+            return rays, depth_scale
         return rays # (3,HW)
     
     def project(self, rays: Array) -> Array:
@@ -195,7 +200,7 @@ class PinholeCamera(Camera):
         dy = y[:,-1:] - y[:,1:]
         dy = concat([dy, dy[:,-2:-1]],dim=1)
         radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
-        return radii.reshape(-1,1)
+        return radii.reshape(-1,1) # (HW,1)
 
 # TODO
 class OpenCVFIsheyeCamera(Camera):
@@ -224,6 +229,47 @@ class OpenCVFIsheyeCamera(Camera):
     
     def inv_K(self):
         return np.linalg.inv(self.K())
+
+class EquirectangularCamera(Camera):
+    def __init__(self, cam_dict: Dict[str, Any]):
+        super(EquirectangularCamera, self).__init__(cam_dict)
+        self.cam_type = CamType.EQUIRECT
+        
+        self.min_phi_deg:float = cam_dict["min_phi_deg"]
+        self.max_phi_deg:float = cam_dict["max_phi_deg"]
+        self.cx = self.width / 2.0
+        self.cy = (self.height - 1.) / 2.0
+        
+    def get_rays(self, uv:np.ndarray = None, out_scale:bool=False):
+        if uv is None: uv = self.make_pixel_grid()
+        theta = (uv[0:1,:]-self.cx) / self.cx * np.pi
+        phi_scale = np.deg2rad((self.max_phi_deg - self.min_phi_deg)*0.5)
+        phi_offset = np.deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
+        phi = (uv[1:2,:] - self.cy) / self.cy * phi_scale - phi_offset
+        x = sin(theta) * cos(phi)
+        y = cos(theta) * cos(phi)
+        z = sin(phi)
+        ray = concat([x,y,z],0)
+        invalid_ray = np.logical_or(phi < self.min_phi_deg, phi > self.max_phi_deg)
+        ray[:,invalid_ray] = np.nan
+        if out_scale:
+            depth_scale = ones_like(z)
+            depth_scale[:,invalid_ray] = np.nan
+            return ray, depth_scale
+        return ray # (3,HW)
+    
+    def project(self, rays:Array) -> Array:
+        return None
+
+    def get_radii(self) -> Tensor:
+        uv = self.make_pixel_grid()
+        dt_theta = np.pi / self.width
+        phi_scale = np.deg2rad((self.max_phi_deg - self.min_phi_deg)*0.5)
+        phi_offset = np.deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
+        phi = (uv[1:2,:] -self.cy) / self.cy * phi_scale - phi_offset
+        radii = 2 * sin(dt_theta) * cos(phi)
+        return radii.reshape(-1,1) * 2 / np.sqrt(12)
+
 
 if __name__ == '__main__':
     

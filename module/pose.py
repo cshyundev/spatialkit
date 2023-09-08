@@ -1,5 +1,5 @@
 import numpy as np
-from .rotation import Rotation, SO3_to_so3
+from .rotation import Rotation, SO3_to_so3, slerp
 from .hybrid_operations import *
 from .hybrid_math import *
 
@@ -12,7 +12,6 @@ def SE3_to_se3(SE3: Array) -> Array:
     so3 = SO3_to_so3(R)    
     se3 = stack([so3, t], dim=0)
     return se3
-
 
 class Pose:
     """
@@ -125,7 +124,24 @@ class Pose:
         p = self.rot.apply_pts3d(pts3d)
         if is_tensor(pts3d): return p + convert_tensor(self.t, pts3d)
         return p + convert_numpy(self.t) 
-    
+
+
+def interpolate_pose(p1:Pose,p2:Pose,t:float) -> Pose:
+    """
+    Interpolate Pose using Lerp and SLerp.
+    translation: linear interpolation(Lerp)
+    rotation: spherical linear interpolation(Slerp)
+    Args:
+        p1: Pose, start Pose
+        p2: Pose, end Pose
+        t: interpolation parameter
+    Return:
+        Interpolated Pose
+    """
+    r=slerp(p1.rot,p2.rot,t)
+    trans1, trans2 = p1.t, p2.t
+    trans = trans1 * (1.- t) + trans2 * t
+    return Pose(t=trans,rot=r)
     
 if __name__ == '__main__':
     rot = [  0.9958109, -0.0487703,  0.0773446,

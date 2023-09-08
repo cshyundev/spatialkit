@@ -39,7 +39,7 @@ def normal_to_image(normal: Array) -> np.ndarray:
     r = (normal[:,:,0] + 1) / 2.0 # (H,W,3)
     g = (-normal[:,:,1] + 1) / 2.0
     b = (-normal[:,:,2] + 1) / 2.0
-    color_mapped = convert_image(np.stack((r, g, b), -1)*255) 
+    color_mapped = convert_image(np.stack((r, g, b), -1)) 
     return color_mapped
 
 def concat_images(images:List[Array], vertical:bool=False):
