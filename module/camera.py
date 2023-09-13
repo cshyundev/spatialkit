@@ -49,6 +49,8 @@ class Camera:
             return PinholeCamera(cam_dict)
         elif cam_type is CamType.OPENCV_FISHEYE:
             raise NotImplementedError
+        elif cam_type is CamType.EQUIRECT:
+            return EquirectangularCamera(cam_dict)
         else:
             raise Exception("Unkwon Camera Type")
 
@@ -245,12 +247,12 @@ class EquirectangularCamera(Camera):
         theta = (uv[0:1,:]-self.cx) / self.cx * np.pi
         phi_scale = np.deg2rad((self.max_phi_deg - self.min_phi_deg)*0.5)
         phi_offset = np.deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
-        phi = (uv[1:2,:] - self.cy) / self.cy * phi_scale - phi_offset
+        phi = (uv[1:2,:] - self.cy) / self.cy * phi_scale + phi_offset
         x = sin(theta) * cos(phi)
-        y = cos(theta) * cos(phi)
-        z = sin(phi)
+        y = sin(phi)
+        z = cos(theta) * cos(phi)
         ray = concat([x,y,z],0)
-        invalid_ray = np.logical_or(phi < self.min_phi_deg, phi > self.max_phi_deg)
+        invalid_ray = np.logical_or(phi < self.min_phi_deg, phi > self.max_phi_deg).reshape(-1,)
         ray[:,invalid_ray] = np.nan
         if out_scale:
             depth_scale = ones_like(z)
