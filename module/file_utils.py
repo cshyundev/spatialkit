@@ -28,17 +28,17 @@ def read_float(path: str) -> np.ndarray:
         data = None
     return data    
 
-def write_float(image:Array, path:str):
-    x = convert_numpy(x)
+def write_float(x:Array, path:str):
+    data = convert_numpy(x)
     extension = path.split(sep=".")[-1]
     try:
         if extension == "npy":
-            np.save(data, path)
+            np.save(path,data)
         elif extension == "tiff":
             with tifffile.TiffWriter(path) as tiff:
-                if image.dtype is not np.float32:
-                    image = image.astype(np.float32)
-                tiff.write(image, photometric='MINISBLACK',
+                if data.dtype is not np.float32:
+                    data = data.astype(np.float32)
+                tiff.write(data, photometric='MINISBLACK',
                     bitspersample=32, compression='zlib')
         else: raise Exception("No Support Extension.")
     except Exception as e:
@@ -56,6 +56,8 @@ def read_image(path: str, as_float:bool=False) -> np.ndarray:
         return None
 
 def write_image(image:Array, path: str):
+    if len(image.shape) == 3 and image.shape[-1]== 1:
+        image = reduce_dim(image,-1)
     pil_image = Image.fromarray(image)
     extension = path.split(sep=".")[-1]
     pil_image.save(path, extension)

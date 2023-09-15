@@ -176,7 +176,7 @@ class PinholeCamera(Camera):
         rays = concat([x,y,z], 0) # (3,HW)
         if norm: rays = normalize(rays, 0)
         if out_scale:
-            depth_scale = 1. / rays[2:3,:]
+            depth_scale = rays[2:3,:]
             return rays, depth_scale
         return rays # (3,HW)
     

@@ -29,53 +29,6 @@ def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=Non
         mesh.vertex_colors = convert_numpy(vertex_colors)
     if save_path: o3d.io.write_triangle_mesh(save_path, mesh)
     return mesh
-
-def compute_depth_to_normal(depth:np.ndarray, rays:np.ndarray, window_size:int=3) -> np.ndarray:
-    """
-    Args:
-        depth: (H,W), depth map
-        rays: (H*W,3), camera ray  
-    Return:
-        normal: (H,W,3), normal map from depth map
-    """
-    height, width = depth.shape[0:2]
-    depth = expand_dim(depth,2)
-    rays = rays.reshape(height,width,3)
-    points = depth * rays # (H,W,3)
-    pad_size = window_size // 2
-    points = np.pad(points,((pad_size,pad_size),(pad_size,pad_size),(0,0)), mode='edge') # (H+pad*2,W+pad*2,3)
-    point_stack = []
-    for i in range(window_size):
-        for j in range(window_size):
-            point_stack.append(points[i:height+i,j:width+j,:])
-    point_stack = stack(point_stack, dim=3) # (H,W,3,window_size*window_size)
-    eigen_vector, _  = compute_pca(point_stack)
-    
-    
-def compute_pca(data):
-    H, W, _, N = data.shape
-
-    # 1. Reshape data
-    reshaped_data = data.transpose(2, 0, 1, 3).reshape(3, -1)
-
-    # 2. Center the data
-    mean = np.mean(reshaped_data, axis=1, keepdims=True)
-    centered_data = reshaped_data - mean
-
-    # 3. Compute the covariance matrix
-    cov_matrix = np.cov(centered_data)
-
-    # 4. Compute eigenvectors & eigenvalues of the covariance matrix
-    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
-
-    # Sort eigenvalues & eigenvectors
-    sorted_indices = np.argsort(eigenvalues)[::-1]
-    sorted_eigenvectors = eigenvectors[:, sorted_indices]
-    sorted_eigenvalues = eigenvalues[sorted_indices]
-
-    return sorted_eigenvectors, sorted_eigenvalues
-    
-    
     
 
 class MultiView:
@@ -225,14 +178,15 @@ class MultiView:
         pts3d = []
         colors = []
         
-        for i in range(self.n_views):
+        for i in range(self.n_views-1):
             rays = self.cameras[i].get_rays(norm=False) # [n,3]
             origin, direction = self.poses[i].get_origin_direction(rays) # [n,3], [n,3]
             depth = read_float(self.depth_path[i]).reshape(-1,1)
-            pts3d_w = origin + depth * direction            
-            pts3d.append(pts3d_w)
-            color = read_image(self.image_path[i],as_float=True).reshape(-1,3) # as_float:0~255 -> 0~1.          
-            colors.append(color)
+            if depth is not None:
+                pts3d_w = origin + depth * direction            
+                pts3d.append(pts3d_w)
+                color = read_image(self.image_path[i],as_float=True).reshape(-1,3) # as_float:0~255 -> 0~1.          
+                colors.append(color)
         pts3d = concat(pts3d, 0)
         colors = concat(colors, 0)            
         
