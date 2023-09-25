@@ -16,6 +16,8 @@ class CamType(Enum):
             return CamType.PINHOLE
         elif type_str == 'OPENCV_FISHEYE':
             return CamType.OPENCV_FISHEYE
+        elif type_str == 'EQUIRECT':
+            return CamType.EQUIRECT
         else:
             return CamType.NONE
         
