@@ -193,16 +193,22 @@ class PinholeCamera(Camera):
         v = self.fy * y + self.cy
         return concat([u,v], dim=0) # (2,HW)
 
-    def get_radii(self, err_thr:float = 1e-6, max_iter:int = 5):
-        uv = self.make_pixel_grid()
-        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
-        y = (uv[1:2,:] - self.cy) / self.fy # (1,HW)
+    def get_radii(self, uv:np.ndarray=None, err_thr:float = 1e-6, max_iter:int = 5):
+        if uv is None: uv = self.make_pixel_grid()
+        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
+        num_pixels = u.shape[1]
+        uu = concat([u, u+1], dim=1) # (1,2N)
+        vv = concat([v, v+1], dim=1) # (1,2N)
+        xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
+        yy = (vv - self.cy) / self.fy # (1,2N)
         if self.radial_params[0] != 0.:
-            x,y = self._undistort(x,y,err_thr, max_iter)
-        dx = x[:,:-1] - x[:,1:]
-        dx = concat([dx, dx[:,-2:-1]], dim=1)
-        dy = y[:,-1:] - y[:,1:]
-        dy = concat([dy, dy[:,-2:-1]],dim=1)
+            xx,yy = self._undistort(xx,yy,err_thr, max_iter)
+        # dx = x[:,:-1] - x[:,1:]
+        # dx = concat([dx, dx[:,-2:-1]], dim=1)
+        # dy = y[:,-1:] - y[:,1:]
+        # dy = concat([dy, dy[:,-2:-1]],dim=1)
+        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
+        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
         radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
         return radii.reshape(-1,1) # (HW,1)
 
@@ -265,8 +271,8 @@ class EquirectangularCamera(Camera):
     def project(self, rays:Array) -> Array:
         return None
 
-    def get_radii(self) -> Tensor:
-        uv = self.make_pixel_grid()
+    def get_radii(self, uv:np.ndarray=None) -> Tensor:
+        if uv is None: uv = self.make_pixel_grid()
         dt_theta = np.pi / self.width
         phi_scale = np.deg2rad((self.max_phi_deg - self.min_phi_deg)*0.5)
         phi_offset = np.deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
