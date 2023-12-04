@@ -18,15 +18,15 @@ def convert_image(image: Array) -> Array:
         image = image.astype(np.uint8)
     return image
 
-# convert depth to color image
-def depth_to_image(depth:Array,min_v:float=None,max_v:float=None, color_map:str='magma') -> np.ndarray:
-    if len(depth.shape) == 3: depth = reduce_dim(depth,dim=2)
-    depth = convert_numpy(depth)
-    if min_v is None: min_v = depth.min()
-    if max_v is None: max_v = depth.max()
-    depth = np.clip(depth,min_v,max_v)
-    normalized_depth = (depth - min_v) / (max_v -min_v)
-    color_mapped = plt.cm.get_cmap(color_map)(normalized_depth)
+# convert float to color image such as gray or depth
+def float_to_image(v:Array,min_v:float=None,max_v:float=None, color_map:str='magma') -> np.ndarray:
+    if len(v.shape) == 3: v = reduce_dim(v,dim=2)
+    v = convert_numpy(v)
+    if min_v is None: min_v = v.min()
+    if max_v is None: max_v = v.max()
+    v = np.clip(v,min_v,max_v)
+    normalized_v = (v - min_v) / (max_v -min_v)
+    color_mapped = plt.cm.get_cmap(color_map)(normalized_v)
     # remove alpha channel
     color_mapped = (color_mapped[:, :, :3] * 255).astype(np.uint8)
     return color_mapped
@@ -43,11 +43,11 @@ def normal_to_image(normal: Array) -> np.ndarray:
     return color_mapped
 
 def concat_images(images:List[Array], vertical:bool=False):
-        concated_images = convert_image(images[0]) 
+        concated_image = convert_image(images[0]) 
         for image in images[1:]:
-            if vertical: concated_images = concat([concated_images, convert_image(image)],0)
-            else: concated_images = concat([concated_images, convert_image(image)],1)
-        return concated_images
+            if vertical: concated_image = concat([concated_image, convert_image(image)],0)
+            else: concated_image = concat([concated_image, convert_image(image)],1)
+        return concated_image
 
 def draw_circle(image:np.ndarray, pt2d:Tuple[int,int], radius:int=1,
                 rgb:Tuple[int,int,int]=None, thickness:int=2):
@@ -88,5 +88,5 @@ def show_image(image:np.ndarray):
 if __name__ == "__main__":
     from file_utils import write_image
     normal = np.random.rand(480,480,1)*100
-    color_normal = depth_to_image(normal)
+    color_normal = float_to_image(normal)
     write_image(color_normal, "/home/sehyun/normal.png")
