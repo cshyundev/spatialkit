@@ -58,7 +58,7 @@ def so3_to_SO3(so3: Array) -> Array:
     """
     assert is_so3(so3) and len(so3.shape) == 1, (f"Invaild Shape. so3 must be (3), but got {str(so3.shape)}")
     theta = sqrt(so3[0]**2 + so3[1]**2 + so3[2]**2)
-    vec = so3 / theta 
+    vec = so3 / (theta + 1e-15) 
     skew_vec = vec3_to_skew(vec)
     return exponential_map(skew_vec*theta)
 
