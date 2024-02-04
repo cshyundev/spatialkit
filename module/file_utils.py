@@ -17,7 +17,7 @@ def read_float(path: str) -> np.ndarray:
             data = np.load(path)
         elif extension == 'tiff':
             multi_datas = tifffile.TiffFile(path)
-            num_datas = len(multi_datas.pages())
+            num_datas = len(multi_datas.pages)
             if num_datas == 0: raise Exception("No Images.")
             elif num_datas == 1: data = multi_datas.pages[0].asarray().squeeze()
             else: data = concat([expand_dim(x.asarray(),0) for x in multi_datas.pages], 0)
