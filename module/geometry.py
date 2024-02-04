@@ -103,8 +103,9 @@ class MultiView:
             cameras.append(Camera.create_cam(frame["cam"]))
             poses.append(Pose.from_mat(np.array(frame["camtoworld"])))
             image_path.append(osp.join(root,frame["image"]))
-            depth_path.append(osp.join(root,frame["dump_depth"]))
-            normal_path.append(osp.join(root,frame["normal"]))
+            if "depth" in frame:
+                depth_path.append(osp.join(root,frame["depth"]))
+        
         return MultiView(image_path,cameras,poses,depth_path,normal_path)
 
     def fundamental_matrix(self, idx1:int, idx2:int):
@@ -178,7 +179,7 @@ class MultiView:
         pts3d = []
         colors = []
         
-        for i in range(self.n_views-1):
+        for i in range(self.n_views):
             rays = self.cameras[i].get_rays(norm=False) # [n,3]
             origin, direction = self.poses[i].get_origin_direction(rays) # [n,3], [n,3]
             depth = read_float(self.depth_path[i]).reshape(-1,1)
@@ -195,10 +196,8 @@ class MultiView:
     def get_image(self, idx:int) -> np.ndarray:
         return read_image(self.image_path[idx])
     
-if __name__ == '__main__':
+# if __name__ == '__main__':
     
-    array = np.arange(25*3, dtype=np.float32).reshape(5,5,3)
-    print(array)
     
     
     

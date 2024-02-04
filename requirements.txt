@@ -2,3 +2,6 @@ numpy
 torch
 matplotlib
 opencv-python
+tifffile
+scikit-image
+open3d

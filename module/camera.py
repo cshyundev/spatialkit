@@ -187,8 +187,7 @@ class PinholeCamera(Camera):
         Y = rays[1:2,:]
         Z = rays[2:3,:]
         x,y = X / Z, Y / Z
-        if self.radial_params[0] != 0.:
-            x,y = self._distort(x,y)
+        if self.radial_params[0] != 0.: x,y = self._distort(x,y)
         u = self.fx * x + self.skew * y + self.cx 
         v = self.fy * y + self.cy
         return concat([u,v], dim=0) # (2,HW)

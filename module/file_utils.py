@@ -17,7 +17,7 @@ def read_float(path: str) -> np.ndarray:
             data = np.load(path)
         elif extension == 'tiff':
             multi_datas = tifffile.TiffFile(path)
-            num_datas = len(multi_datas.pages())
+            num_datas = len(multi_datas.pages)
             if num_datas == 0: raise Exception("No Images.")
             elif num_datas == 1: data = multi_datas.pages[0].asarray().squeeze()
             else: data = concat([expand_dim(x.asarray(),0) for x in multi_datas.pages], 0)
@@ -25,6 +25,7 @@ def read_float(path: str) -> np.ndarray:
             raise Exception("No Support Extension.")
     except Exception as e:
         print("reading data failed.")
+        print(e)
         data = None
     return data    
 
@@ -42,8 +43,7 @@ def write_float(x:Array, path:str):
                     bitspersample=32, compression='zlib')
         else: raise Exception("No Support Extension.")
     except Exception as e:
-        print("reading data failed.")
-        data = None
+        print("writing data failed.")
     
 def read_image(path: str, as_float:bool=False) -> np.ndarray:
     try:
@@ -83,16 +83,15 @@ def read_yaml(path:str) -> Dict[str, Any]:
             dict = yaml.load(f)
         return dict
     except:
-        raise Exception("Reading yaml file Failed.")
-
+        raise Exception("Reading yaml file failed.")
 
 def write_yaml(path:str, dict:Dict[str,Any]):
     with open(path,"w") as f:
         yaml.dump(dict,f)
 
 
-if __name__ == '__main__':
-    dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"
-    # print(osp.exists(dataset_path))
-    json_dict = read_json(dataset_path)
-    print(json_dict)
+# if __name__ == '__main__':
+#     dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"
+#     # print(osp.exists(dataset_path))
+#     json_dict = read_json(dataset_path)
+#     print(json_dict)

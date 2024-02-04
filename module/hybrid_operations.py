@@ -55,13 +55,12 @@ def reduce_dim(x: Array, dim: int) -> Array:
     else: return np.squeeze(x, axis=dim)
 
 def concat(x: List[Array], dim: int) -> Array:
-     if is_tensor(x[0]): return torch.cat(x, dim=dim)
-     return np.concatenate(x, axis=dim)
+    if is_tensor(x[0]): return torch.cat(x, dim=dim)
+    return np.concatenate(x, axis=dim)
 
 def stack(x: List[Array], dim:int) -> Array:
      if is_tensor(x[0]): return torch.stack(x, dim=dim)
      return np.stack(x, axis=dim)
-
 
 def ones_like(x: Array) -> Array:
     assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")

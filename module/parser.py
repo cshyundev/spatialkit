@@ -6,7 +6,7 @@ from module.file_utils import *
 import cv2 as cv
 
 def parse_monosdf_dataset(dataset_path:str,
-                          center_crop_type,
+                          center_crop_type:str,
                           cam_type:str, margin:float):
     """
     Parse  monosdf dataset to dictionary
@@ -91,7 +91,7 @@ def parse_monosdf_dataset(dataset_path:str,
             "image": f"{frame_id:06d}_rgb.png",
             "depth": f"{frame_id:06d}_depth.npy",
             "normal": f"{frame_id:06d}_normal.npy",
-            "dump_depth": f"{frame_id:06d}_pred_depth.npy" # for debug
+            # "dump_depth": f"{frame_id:06d}_pred_depth.npy" # for debug
         }
         frames.append(frame)
 

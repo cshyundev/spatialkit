@@ -127,7 +127,6 @@ class Pose:
         if is_tensor(pts3d): return p + convert_tensor(self.t, pts3d)
         return p + convert_numpy(self.t) 
 
-
 def interpolate_pose(p1:Pose,p2:Pose,t:float) -> Pose:
     """
     Interpolate Pose using Lerp and SLerp.
