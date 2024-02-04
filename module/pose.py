@@ -34,8 +34,9 @@ class Pose:
         if t is None: t = np.array([0.,0.,0.])
         if rot is None: rot = Rotation.from_mat3(np.eye(3))
 
-        assert (is_array(t)), ('translation must be array type(Tensor or Numpy)')
-        assert(type(t) == rot.type), ('Rotation and Tranlsation must be same array type(Tensor or Numpy)')
+        assert (is_array(t)), ('translation must be array type(Tensor or Numpy).')
+        assert(type(t) == rot.type), ('Rotation and Tranlsation must be same array type(Tensor or Numpy).')
+        assert(t.size == 3), ('size of translation must be 3.')
 
         if t.shape == (3,):
             t = t.reshape(1,3)
@@ -115,8 +116,9 @@ class Pose:
         |R t||R' t'| = |RR' Rt' + t|
         |0 1||0  1 |   |0       1  |
         """   
-        rot = pose.rot.dot(self.rot)
-        t = self.rot.apply_pts3d(pose.t) + self.t
+        mat4 = self.mat44()@pose.mat44() 
+        t = mat4[:3,3]
+        rot = Rotation.from_mat3(mat4[:3,:3])
         return Pose(t, rot)
     
     def apply_pts3d(self, pts3d: Array) -> Array:
