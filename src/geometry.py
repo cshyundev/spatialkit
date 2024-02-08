@@ -1,10 +1,10 @@
 import numpy as np
 
-from module.hybrid_operations import *
-from module.pose import Pose
-from module.camera import *
-from module.file_utils import *
-from module.plot import * 
+from src.hybrid_operations import *
+from src.pose import Pose
+from src.camera import *
+from src.file_utils import *
+from src.plot import * 
 import open3d as o3d 
 from typing import *
 import os.path as osp

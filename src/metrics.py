@@ -1,4 +1,4 @@
-from module.hybrid_operations import *
+from .hybrid_operations import *
 
 def compute_mse(x:Array, y:Array, mask:Optional[Array]=None):
     assert (x.shape == y.shape),(f"Shape of x and y must be same, but x:{str(x.shape)}, y:{str(y.shape)}")

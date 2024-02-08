@@ -1,5 +1,5 @@
-from module.hybrid_operations import *
-from module.hybrid_math import *
+from src.hybrid_operations import *
+from src.hybrid_math import *
 import matplotlib.pyplot as plt
 import cv2 as cv
 

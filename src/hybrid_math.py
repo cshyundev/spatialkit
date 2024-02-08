@@ -1,4 +1,4 @@
-from module.hybrid_operations import *
+from src.hybrid_operations import *
 from scipy.linalg import expm, logm
 
 def norm_l2(x: Array, dim:int, keepdim:bool=True):
@@ -27,7 +27,7 @@ def permute(x:Array, dims:Tuple[int]) -> Array:
     return x.transpose(dims)
 
 def abs(x:Array) -> Array:
-    if is_tensor(x): torch.abs(x)
+    if is_tensor(x): return torch.abs(x)
     return np.abs(x)
 
 def sqrt(x: Array) -> Array:
@@ -41,23 +41,35 @@ def exponential_map(mat: Array) -> Array:
         return expm(mat)
 
 def sin(x: Array) -> Array:
-    if is_tensor(x): torch.sin(x)
+    if is_tensor(x): return torch.sin(x)
     return np.sin(x)
 
 def cos(x: Array) -> Array:
-    if is_tensor(x): torch.cos(x)
+    if is_tensor(x): return torch.cos(x)
     return np.cos(x)
 
 def tan(x: Array) -> Array:
-    if is_tensor(x): torch.tan(x)
+    if is_tensor(x): return torch.tan(x)
     return np.tan(x)
 
+def arcsin(x: Array) -> Array:
+    if is_tensor(x): return torch.arcsin(x)
+    return np.arcsin(x)
+
 def arcos(x: Array) -> Array:
-    if is_tensor(x): torch.arccos(x)
+    if is_tensor(x): return torch.arccos(x)
     return np.arccos(x)
 
+def arctan(x: Array) -> Array:
+    if is_tensor(x): return torch.arctan(x)
+    return np.arctan(x)
+
+def arctan2(x: Array) -> Array:
+    if is_tensor(x): return torch.arctan2(x)
+    return np.arctan2(x)
+
 def trace(x: Array) -> Array:
-    if is_tensor(x): torch.trace(x)
+    if is_tensor(x): return torch.trace(x)
     return np.trace(x)
 
 def vec3_to_skew(x: Array) -> Array:
@@ -72,6 +84,8 @@ def vec3_to_skew(x: Array) -> Array:
     if is_tensor(x): skew_x = convert_tensor(skew_x,x)
     return skew_x
 
-if  __name__ == "__main__":
-    vec3  = np.array([1,2,3])
-    print(vec3_to_skew(vec3))
+def rad2deg(x: Array) -> Array:
+    return x * (180. / np.pi)
+
+def deg2rad(x: Array) -> Array:
+    return x * (np.pi / 180.)

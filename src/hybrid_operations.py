@@ -77,11 +77,36 @@ def deep_copy(x:Array) -> Array:
 
 def where(condition:Array, x:Array, y:Array) -> Array:
     if is_tensor(condition): return torch.where(condition,x,y)
-    return np.where(condition,x,y)    
+    return np.where(condition,x,y)
 
-# def pad(x:Array, )
+def clip(x:Array, min:float=None,max:float=None) -> Array:
+    if is_tensor(x): return torch.clip(x,min,max)
+    return np.clip(x,min,max)
 
-if __name__ == '__main__':
-    x = np.array(range(30)).reshape(2,3,5)
-    
-    
+def as_int(x:Array,n:int=32) -> Array:
+    if is_tensor(x):
+        if n == 64: return x.type(torch.int64)
+        elif n == 32: return x.type(torch.int32)
+        elif n == 16: return x.type(torch.int16)
+        else: raise TypeError
+    elif is_numpy(x):
+        if n == 256: return x.astype(np.int256)
+        elif n == 128: return x.astype(np.int128)
+        elif n == 64: return x.astype(np.int64)
+        elif n == 32: return x.astype(np.int32)
+        elif n == 16: return x.astype(np.int16)
+        else: raise TypeError
+
+def as_float(x:Array, n:int=32) -> Array:
+    if is_tensor(x):
+        if   n == 64: return x.type(torch.float64)
+        elif n == 32: return x.type(torch.float32)
+        elif n == 16: return x.type(torch.float16)
+        else: raise TypeError
+    elif is_numpy(x):
+        if   n == 256:return x.astype(np.float256)
+        elif n == 128:return x.astype(np.float128)
+        elif n == 64: return x.astype(np.float64)
+        elif n == 32: return x.astype(np.float32)
+        elif n == 16: return x.astype(np.float16)
+        else: raise TypeError
