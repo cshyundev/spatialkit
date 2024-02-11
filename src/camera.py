@@ -90,6 +90,7 @@ class PinholeCamera(Camera):
 
         Args:
             K (List[float]): Intrinsic matrix parameters as a list [fx, skew, cx, fy, cy].
+            image_size (List[int]): Image resolution as a list [width, height].
             dist (List[float]): Distortion coefficients as a list [k1, k2, p1, p2, k3].
 
         Returns:
@@ -113,19 +114,23 @@ class PinholeCamera(Camera):
         return PinholeCamera(cam_dict)
     
     @staticmethod
-    def from_fov(image_size:List[int], fov:List[float]):
+    def from_fov(image_size:List[int], fov:Union[List[float],float]):
         """
         Static method to create a PinholeCamera instance from image resolution and field of view.
 
         Args:
             image_size (List[int]): Image resolution as a list [width, height].
-            fov(List[float]): Field of view in degrees as a list [fov_x, fov_y].
+            fov(Union[List[float],float]): Field of view in degrees as a list [fov_x, fov_y] or width field of view.
 
         Returns:
             PinholeCamera: An instance of PinholeCamera with calculated parameters.
         """
         width,height = image_size
-        fov_x, fov_y = fov
+        if type(fov) == float:
+            fov_x = fov
+            fov_y = fov * height / width
+        else:
+            fov_x, fov_y = fov
         # Calculate focal length based on FOV and image resolution
         fx = width / (2 * tan(deg2rad(fov_x) / 2))
         fy = height / (2 * tan(deg2rad(fov_y) / 2))
@@ -159,7 +164,7 @@ class PinholeCamera(Camera):
     
     @property
     def inv_K(self):
-        return np.linalg.inv(self.K())
+        return np.linalg.inv(self.K)
     
     @property
     def fov(self):
@@ -182,21 +187,21 @@ class PinholeCamera(Camera):
         r2 = x2 + y2
         xy = x*y
         k1,k2,k3 = self.radial_params[0], self.radial_params[1], self.radial_params[2] 
-        radial_distortion = 1. + r2 * (k1 + r2 * (k2 + k3 *r2))
+        rd = 1. + r2 * (k1 + r2 * (k2 + k3 *r2))
         p1, p2 = self.tangential_params[0], self.tangential_params[1]
-        x_tangential_distortion = 2*p1*xy + p2*(r2 + 2*x2)
-        y_tangential_distortion = p1*(r2 + 2*y2) + 2*p2*xy
-        x_dist = x * radial_distortion + x_tangential_distortion
-        y_dist = y * radial_distortion + y_tangential_distortion
+        # Tangential distortion term (tdx,tdy)
+        tdx = 2*p1*xy + p2*(r2 + 2*x2) 
+        tdy = p1*(r2 + 2*y2) + 2*p2*xy
+        xd = x * rd + tdx
+        yd = y * rd + tdy
         
         if extra:
-            # compute derivative of radial distortion, x, y
-            radial_distortion_r = k1 + r2 * (2. * k2 + 3. * k3 * r2)
-            radial_distortion_x = 2. * x * radial_distortion_r
-            radial_distortion_y = 2. * y * radial_distortion_r
-            return x_dist, y_dist, radial_distortion, \
-                radial_distortion_x, radial_distortion_y
-        return x_dist, y_dist
+            # Compute derivative of radial distortion, x, y
+            rd_r = k1 + r2 * (2. * k2 + 3. * k3 * r2)
+            rd_x = 2. * x * rd_r
+            rd_y = 2. * y * rd_r
+            return xd, yd, rd, rd_x, rd_y
+        return xd, yd
         
     def _compute_residual_jacobian(self,xu:Array,yu:Array, xd:Array, yd:Array) \
             -> Tuple[Array,Array,Array,Array,Array,Array]:
@@ -217,17 +222,17 @@ class PinholeCamera(Camera):
         The derivatives are calculated based on the distortion model which includes radial and tangential components.
         """
         # Compute distorted coordinates (_xd, _yd) and the distortion terms
-        # (dist, dist_x, dist_y) based on the undistorted coordinates (xu, yu)
-        _xd,_yd, dist, dist_x, dist_y = self._distort(xu,yu,True)
+        # Radial distortio term and its partial derivative (d, d_x, d_y)
+        _xd,_yd, d, d_x, d_y = self._distort(xu,yu,True)
         x_res,y_res = _xd - xd, _yd - yd
         
         p1, p2 = self.tangential_params[0], self.tangential_params[1]
         # Compute derivative of x_dist over x and y 
-        x_res_x = dist + dist_x * xu + 2. * p1 * yu + 6. * p2 * xu
-        x_res_y = dist_y * xu + 2. * p1 * xu + 2. * p2 * yu
+        x_res_x = d + d_x * xu + 2. * p1 * yu + 6. * p2 * xu
+        x_res_y = d_y * xu + 2. * p1 * xu + 2. * p2 * yu
         # Compute derivative of y_dist over x and y        
-        y_res_x = dist_x * yu + 2.0 * p2 * yu + 2.0 * p1 * xu
-        y_res_y = dist + dist_y * yu + 2.0 * p2 * xu + 6.0 * p1 * yu
+        y_res_x = d_x * yu + 2.0 * p2 * yu + 2.0 * p1 * xu
+        y_res_y = d + d_y * yu + 2.0 * p2 * xu + 6.0 * p1 * yu
         
         return x_res, y_res, x_res_x, x_res_y, y_res_x, y_res_y
         
@@ -370,8 +375,22 @@ class PinholeCamera(Camera):
         u,v = self._to_image_plane(xu,yu,use_clip)
         return as_int(concat([u,v], dim=0),n=32)   # (2,HW)
 
-# TODO
+# For Fisheye Camera
 class EquidistantCamera(Camera):
+    """
+    Represents an Equidistant (Equiangular) Camera Model, typically used for wide-angle or fisheye lenses.
+    This model is characterized by its equidistant projection, where radial distances are proportional to the actual angles.
+
+    Attributes:
+        cam_type (CamType): Camera type, set to EQUIDISTANT, indicating the equidistant projection model.
+        fx, fy (float): Focal length in x and y directions. These parameters define the scale of the image on the sensor.
+        cx, cy (float): Principal point coordinates (center of the image), indicating where the optical axis intersects the image sensor.
+        skew (float): Skew coefficient between x and y axis, representing the non-orthogonality between these axes.
+        radial_params (List[float]): Radial distortion parameters [k1, k2, k3, k4], specifying the lens's radial distortion. Typically used in distortion correction algorithms.
+    
+    https://docs.opencv.org/3.4/db/d58/group__calib3d__fisheye.html#ga75d8877a98e38d0b29b6892c5f8d7765    
+    """
+
     def __init__(self, cam_dict: Dict[str, Any]):
         super(EquidistantCamera, self).__init__(cam_dict)
         
@@ -380,11 +399,10 @@ class EquidistantCamera(Camera):
         self.fx, self.fy = cam_dict['focal_length']
         self.cx, self.cy = cam_dict['principal_point']
         self.skew = cam_dict['skew']
-        self.radial_params = cam_dict['radial'] # k1,k2,k3,k4,k5
-        self.tangential_params = cam_dict['tangential'] # p1,p2
+        self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
       
     @property
-    def K(self):
+    def K(self) -> np.ndarray:
         K = np.eye(3)
         K[0,0] = self.fx
         K[1,1] = self.fy
@@ -394,14 +412,140 @@ class EquidistantCamera(Camera):
         return K
     
     @property
-    def inv_K(self):
-        return np.linalg.inv(self.K())
+    def inv_K(self) -> np.ndarray:
+        return np.linalg.inv(self.K)
     
-    def get_rays(uv:np.ndarray = None, out_scale:bool=False):
-        raise NotImplementedError
+    @property
+    def dist_coeffs(self):
+        return np.array(self.radial_params) 
+
+    @staticmethod
+    def from_K_D(K: List[float], image_size:List[int], D: List[float]) -> 'EquidistantCamera':
+        """
+        Static method to create an EquidistantCamera (fisheye) instance from intrinsic matrix and distortion coefficients.
+
+        Args:
+            K (List[float]): Intrinsic matrix parameters as a list [fx, skew, cx, fy, cy].
+            image_size (List[int]): Image resolution as a list [width, height].
+            dist (List[float]): Distortion coefficients as a list [k1, k2, k3, k4].
+        Returns:
+            EquidistantCamera: An instance of PinholeCamera with given parameters.
+        """
+
+        cam_dict = {
+            'image_size': image_size,
+            'focal_length': (K[0][0], K[1][1]), # fx and fy
+            'principal_point': (K[0][2], K[1][2]), # cx and cy
+            'skew': K[0][1],
+            'radial': D
+        }
+        return EquidistantCamera(cam_dict)
+
+    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
+        u = self.fx * x + self.skew * y + self.cx
+        v = self.fy * y + self.cy
+        if use_clip:
+            u = clip(u,0.,float(self.width))
+            v = clip(v,0.,float(self.height))
+        return u,v
     
-    def project_rays(self, rays: ndarray) -> ndarray:
-        return super().project_rays(rays)
+    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
+        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
+        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
+        return x,y
+
+    def _distort(self, x: Array, y: Array, extra:bool=False) \
+            -> Tuple[Array,Array]:
+        x2, y2 = x**2, y**2
+        r2 = x2 + y2
+
+        k1,k2,k3,k4 = self.radial_params 
+        rd = 1. + r2 * (k1 + r2 * (k2 + r2* (k3 + r2 * k4)))
+        xd = x * rd
+        yd = y * rd
+
+        if extra:
+            rd_r =  k1 + r2 * (2. * k2 + r2 * (3 * k3 + 4. * k4 * r2))
+            rd_x = 2. * x * rd_r 
+            rd_y = 2. * y * rd_r 
+            return xd, yd, rd, rd_x, rd_y
+        return xd, yd
+
+    def _compute_residual_jacobian(self,xu:Array,yu:Array, xd:Array, yd:Array) \
+            -> Tuple[Array,Array,Array,Array,Array,Array]:
+        
+        """
+        Computes the Jacobian matrix of the residual between undistorted (ideal) points and distorted (actual) points
+        caused by camera lens distortion. Adapted from https://github.com/google/nerfies/blob/main/nerfies/camera.py    
+        Parameters:
+        - xu, yu: Arrays of x and y coordinates of the undistorted points.
+        - xd, yd: Arrays of x and y coordinates of the distorted points.
+    
+        Returns:
+        - Tuple containing six arrays:
+        - x_res, y_res: The residuals in x and y directions.
+        - x_res_x, x_res_y: Partial derivatives of the x residual with respect to x and y.
+        - y_res_x, y_res_y: Partial derivatives of the y residual with respect to x and y.
+
+        The derivatives are calculated based on the radial distortion model.
+        """
+        # Compute distorted coordinates (_xd, _yd) and the distortion terms
+        # Radial distortion term and its partial derivative (d, d_x, d_y)        
+        _xd,_yd, d, d_x, d_y = self._distort(xu,yu,True)
+        x_res,y_res = _xd - xd, _yd - yd
+        
+        # Compute derivative of x_dist over x and y 
+        x_res_x = d + d_x * xu 
+        x_res_y = d_y * xu
+        # Compute derivative of y_dist over x and y        
+        y_res_x = d_x * yu
+        y_res_y = d + d_y * yu
+        
+        return x_res, y_res, x_res_x, x_res_y, y_res_x, y_res_y
+
+    def _undistort(self, xd:Array, yd:Array, err_thr:float, max_iter:int) \
+        -> Tuple[Array,Array]:
+        
+        xu,yu = deep_copy(xd), deep_copy(yd)
+        
+        for _ in range(max_iter):
+            rx, ry, rx_x, rx_y, ry_x, ry_y \
+                = self._compute_residual_jacobian(xu, yu, xd, yd)
+            if sqrt(rx**2 + ry**2).max() < 1e-4: break
+            Det = ry_x * rx_y - rx_x * ry_y
+            x_numerator,y_numerator = ry_y*rx-rx_y*ry, rx_x*ry-ry_x*rx
+            step_x = where(abs(Det) > err_thr, x_numerator / Det, zeros_like(Det))
+            step_y = where(abs(Det) > err_thr, y_numerator / Det, zeros_like(Det))
+            xu = xu + clip(step_x,-0.5, 0.5)
+            yu = yu + clip(step_y,-0.5, 0.5)
+        return xu,yu
+
+    def get_rays(self,
+                 uv:Array = None, 
+                 norm:bool = True,
+                 out_scale:bool = False,
+                 err_thr:float = 1e-4,
+                 max_iter:int = 20
+                 ) -> Array:
+        if uv is None: uv = self.make_pixel_grid() # (2,HW)
+        xd,yd = self._to_normalized_plane(uv)
+        x,y = self._undistort(xd,yd,err_thr, max_iter)
+        z = ones_like(x)
+        rays = concat([x,y,z], 0) # (3,HW)
+        if norm: rays = normalize(rays, 0)
+        if out_scale:
+            depth_scale = rays[2:3,:]
+            return rays, depth_scale
+        return rays # (3,HW)
+    
+    def project_rays(self, rays: Array) -> Array:
+        X = rays[0:1,:]
+        Y = rays[1:2,:]
+        Z = rays[2:3,:]
+        x,y = X / Z, Y / Z
+        x,y = self._distort(x,y)
+        u,v = self._to_image_plane(u,v)
+        return as_int(concat([u,v], dim=0),n=32)
 
 class EquirectangularCamera(Camera):
     """

@@ -2,18 +2,38 @@ import numpy as np
 from .hybrid_operations import *
 from .hybrid_math import *
 from scipy.spatial.transform import Rotation as R
-
-# print(os.path.dirname(os.path.abspath(__file__)))
-# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from enum import Enum
 
 # The lists of available rotation parameterization
 ROT_TYPES = [
-    'SO3',  
-    'so3',  # so(3) axis angle
+    'SO3',  # SO(3): Special orthogonal group 
+    'so3',  # so(3): axis angle
     'quat_xyzw', # Quaternion with 'xyzw' ordering
     'quat_wxyz', # Quaternion with 'wxyz' ordering
     # 'rpy'   # Roll-Pitch-Yaw, Note that Ordering is matter # TODO
 ]
+
+class RotType(Enum):
+    SO3 = ("SO3", "SO(3): Special orthogonal group")
+    so3 = ("so3", "so(3): Lie Algebra of SO(3)")
+    QUAT_XYZW = ("QUAT_XYZW", "Quaternion with 'xyzw' ordering")
+    QUAT_WXYZ = ("QUAT_WXYZ", "Quaternion with 'wxyz' ordering")
+    NONE = ("NONE", "NoneType")
+
+    @staticmethod
+    def from_string(type_str: str)-> 'RotType':
+        if type_str == 'SO3':
+            return RotType.SO3
+        elif type_str == 'so3':
+            return RotType.so3
+        elif type_str == 'QUAT_XYZW':
+            return RotType.QUAT_XYZW
+        elif type_str == 'QUAT_WXYZ':
+            return RotType.QUAT_XYZW
+        else:
+            return RotType.NONE
+
+
 
 def is_SO3(x: Array) -> bool:
     """
