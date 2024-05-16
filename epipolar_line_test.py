@@ -43,7 +43,7 @@ def main(unused_args):
     K = [[0., 0., 0.],
         [0., 0.,  0.],
         [0., 0.,  1.]]
-    dist = [0., 0., 0., 0., 0.] # distortion paremeter k1,k2,p1,p2,k3
+    dist = [0., 0., 0., 0., 0.] # distortion paremeters k1,k2,p1,p2,k3
 
 
     # 3. poses for each images
@@ -61,7 +61,7 @@ def main(unused_args):
                   [0., 0., 0., 0.]]
 
     ###################################################
-    # Do not Modify Codes!!!
+    # Do not modify the code below!!!
     image_path = [osp.join(base_folder_path,left_image_name), 
                   osp.join(base_folder_path,right_image_name)]  
 
