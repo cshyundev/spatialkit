@@ -75,8 +75,8 @@ def main(unused_args):
     ###################################################
     # Select 4 points. You can change the number of points.
     n_pts = 4
-    left_pt2d = multiview.choice_points(0,5,n_pts)
-    image = multiview.draw_epipolar_line(idx1=0,idx2=5,left_pt2d=left_pt2d)
+    left_pt2d = multiview.choice_points(0,1,n_pts)
+    image = multiview.draw_epipolar_line(idx1=0,idx2=1,left_pt2d=left_pt2d)
     show_image(image)
  
 
