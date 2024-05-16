@@ -89,3 +89,11 @@ def rad2deg(x: Array) -> Array:
 
 def deg2rad(x: Array) -> Array:
     return x * (np.pi / 180.)
+
+def svd(x: Array) -> Array:
+    if is_tensor(x): return torch.svd(x)
+    return np.linalg.svd(x)
+
+def mean(x: Array, dim:int) -> Array:
+    if is_tensor(x): return torch.mean(x,dim=dim)
+    return np.mean(x,axis=dim)

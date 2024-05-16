@@ -108,8 +108,8 @@ class Pose:
     
     def inverse(self):
         R_inv = self.rot.inverse()
-        t_inv = -R_inv.apply_pts3d(self.t)
-        return Pose(t_inv, R_inv)
+        t_inv = -R_inv.apply_pts3d(transpose2d(self.t))
+        return Pose(transpose2d(t_inv), R_inv)
 
     def merge(self, pose:'Pose') -> 'Pose':
         """

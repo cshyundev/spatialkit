@@ -5,3 +5,5 @@ opencv-python
 tifffile
 scikit-image
 open3d
+pillow
+absl-py
