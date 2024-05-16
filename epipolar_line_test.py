@@ -30,9 +30,9 @@ def main(unused_args):
     
     # Set Parameters
     # 1.base folder and image name
-    base_folder_path:str = "./Replica/scan1"
-    left_image_name:str  = "000000_rgb.png" 
-    right_image_name:str = "000001_rgb.png"
+    base_folder_path:str = ""
+    left_image_name:str  = "" 
+    right_image_name:str = ""
 
     # 2. Intrinsic Matrix Format
     # [[fx,skew, cx],
