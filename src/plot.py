@@ -81,8 +81,9 @@ def draw_line_by_line(image:np.ndarray, line: Tuple[float,float,float],
         x1,y1 = map(int, [w, -(line[2]+line[0]*w)/line[1]])
     return cv.line(image,(x0,y0), (x1,y1), rgb, thickness)
     
-def show_image(image:np.ndarray):
+def show_image(image:np.ndarray, title:str="image"):
     plt.imshow(image)
+    plt.title(title)
     plt.show()
 
 if __name__ == "__main__":

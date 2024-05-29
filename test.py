@@ -10,37 +10,39 @@ import absl.app as app
 from cv2 import undistortPoints
 from numpy.testing import assert_almost_equal
 from src.camera import PinholeCamera
+from src.image_transform import *
 
 def main(unused_args):
+
+    img = read_image("./image.png")
     
-    test_cam = PinholeCamera.from_K(
-    K = [[2960.5102118128075/2., 0., 2874.4394903402335/2.],
-         [0.,2960.5102118128075/2.,  4314.472094388692/2.],
-         [0., 0., 1.]],
-    image_size = [5784//2,8660//2],
-    dist=[
-        -0.03823023528744702,
-        0.011062009972943147,
-        -0.0004975289812637742,
-        0.0002160237193391678,
-        -0.0009125422794027956
-      ]
-    )
+    def show_images(left_image: np.ndarray, right_image: np.ndarray, left_title: str, right_title: str):
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        axes[0].imshow(left_image)
+        axes[0].set_title(left_title)
+        axes[0].axis('off')
 
-    uv = test_cam.make_pixel_grid()
-    undist_uv = test_cam.undistort_pixel(uv,False)
-    dist_uv = test_cam.distort_pixel(undist_uv,False)
-    # res = norm_l2(uv-dist_uv,dim=0,keepdim=False)
-    res = norm_l2(uv-dist_uv,dim=0,keepdim=False)
+        axes[1].imshow(right_image)
+        axes[1].set_title(right_title)
+        axes[1].axis('off')
 
-    print(f"max error: {res.max()}")
-    print(f"min error: {res.min()}")
-    print(f"mean error:{res.mean()}")
-
-    # compare to opencv function
+        plt.show()
     
-
-
+    camera = PinholeCamera.from_fov(img.shape[0:2], 60.)
+    inv_K = camera.inv_K
+    camera = PinholeCamera.from_fov((150,150), 60.)
+    new_K = camera.K
+    
+    
+    # fwd_wrapper = ImageWarper(similarity(90.,135.,.93,1.), img.shape[0:2], (271,186), mode='forward')
+    # inv_wrapper = ImageWarper( similarity(90.,186,.93,1.), img.shape[0:2], (271,186), mode='inverse')
+    inv_wrapper = ImageWarper(similarity(90.,150,0,1.) @ inv_K @ new_K, img.shape[0:2], (150,150), mode='inverse')
+    
+    # fwd_img = fwd_wrapper(img)
+    inv_img = inv_wrapper(img)
+    show_image(inv_img)
+    # show_image(np.rot90(img,-1))
+    # show_images(left_image=fwd_img,right_image=inv_img,left_title="Forward",right_title="Inverse")
 
     return None
 

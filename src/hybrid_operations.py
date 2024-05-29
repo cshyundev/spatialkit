@@ -61,7 +61,7 @@ def concat(x: List[Array], dim: int) -> Array:
 def stack(x: List[Array], dim:int) -> Array:
      if is_tensor(x[0]): return torch.stack(x, dim=dim)
      return np.stack(x, axis=dim)
-
+  
 def ones_like(x: Array) -> Array:
     assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")
     if is_tensor(x): return torch.ones_like(x)
