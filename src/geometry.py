@@ -29,7 +29,7 @@ def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=Non
         mesh.vertex_colors = convert_numpy(vertex_colors)
     if save_path: o3d.io.write_triangle_mesh(save_path, mesh)
     return mesh
-    
+
 
 class MultiView:
     """
@@ -134,12 +134,14 @@ class MultiView:
         return wtoc2.merge(c1tow)
     
     def choice_points(self, idx1:int, idx2:int, n_points:int) -> List[Tuple[int,int]]:
-        left, right = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])
-        plt.subplot(1,2,1),plt.imshow(left)
-        plt.subplot(1,2,2),plt.imshow(right)
+        left_image, right_image = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])  
+        fig, axs = plt.subplots(1, 2)
+        axs[0].imshow(left_image)
+        axs[1].imshow(right_image)
+        axs[0].set_title(f"Choose {n_points} points on left image")
         pts = plt.ginput(n_points)
         pts = np.int32(pts)
-        plt.close()
+        plt.close(fig)
         return pts.tolist()
     
     def draw_epipolar_line(self, idx1:int, idx2:int,
@@ -195,6 +197,53 @@ class MultiView:
     
     def get_image(self, idx:int) -> np.ndarray:
         return read_image(self.image_path[idx])
+    
+    def __normalize_points(self, pts: Array) -> Tuple[np.ndarray,np.ndarray]:
+        """
+        Normalize the points so that the mean is 0 and the average distance is sqrt(2).
+        """
+            
+        pts = convert_numpy(pts)
+        centroid = np.mean(pts, axis=0)
+        centered_pts = pts - centroid
+        scale = np.sqrt(2) / np.mean(np.linalg.norm(centered_pts, axis=1))
+        transform = np.array([[scale, 0, -scale * centroid[0]],
+                              [0, scale, -scale * centroid[1]],
+                              [0, 0, 1]])
+        normalized_points = np.dot(transform, np.concatenate((pts.T, np.ones((1, pts.shape[0])))))
+        return normalized_points.T, transform
+    
+    def recover_pose(self, left_pts: List[Tuple[int,int]],right_pts: List[Tuple[int,int]], K:Array=None) -> Pose:
+        assert(len(left_pts) >= 3), f"To recover the relative pose, correspondence pairs must be larger than 3, but got {len(left_pts)}"
+        assert(len(right_pts) >= 3), f"To recover the relative pose, correspondence pairs must be larger than 3, but got {len(right_pts)}"
+        assert(len(left_pts) == len(right_pts)), "Correspondence pairs must be same."
+        
+        left_pts = np.array(left_pts)
+        right_pts = np.array(right_pts)
+        
+        left_pts_norm, T1 = self.__normalize_points(left_pts)
+        right_pts_norm, T2 = self.__normalize_points(right_pts)
+        
+        A = []
+        for l,r in zip(left_pts_norm,right_pts_norm):
+            x1, y1 = l 
+            x2, y2 = r
+            A.append([-x1, -y1, -1, 0, 0, 0, x2 * x1, x2 * y1, x2])
+            A.append([0, 0, 0, -x1, -y1, -1, y2 * x1, y2 * y1, y2])
+
+        A = np.array(A)
+        # Compute Homography using SVD decomposition 
+        _, _, Vt = np.linalg.svd(A)
+        H = Vt[-1].reshape((3, 3))
+
+        # denormalize
+        H = np.dot(np.linalg.inv(T2), np.dot(H, T1))
+
+        # Make the last element 1
+        H /= H[-1, -1]
+        
+        return H
+        
     
 # if __name__ == '__main__':
     
