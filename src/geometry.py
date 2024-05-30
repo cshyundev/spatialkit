@@ -112,8 +112,8 @@ class MultiView:
         ## F = K_1^-1*(t×R)*K_2^-1
         ## [R,t]: relative pose from frame1 to frame2
         
-        inv_K1 = self.cameras[idx1].inv_K()
-        K2 = self.cameras[idx2].K()
+        inv_K1 = self.cameras[idx1].inv_K
+        K2 = self.cameras[idx2].K
         E = self.essential_matrix(idx1,idx2)
         F = matmul(np.linalg.inv(K2.T) ,E)
         F = matmul(F,inv_K1)
