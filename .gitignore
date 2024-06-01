@@ -1,4 +1,13 @@
+## Test Code
 test.py
+test.ipynb
+
+## Development
+.vscode/
+__pycache__
+.gitmessage.txt
+
+## images and files
 /replica
 *.json
 *.yaml
