@@ -2,7 +2,10 @@ import numpy as np
 from typing import *
 from src.hybrid_operations import *
 from src.hybrid_math import *
+from src.camera import Camera
 from scipy.ndimage import map_coordinates
+import cv2 as cv
+import random
 
 
 def make_pixel_grid(width:int, height:int) -> np.ndarray:
@@ -97,63 +100,144 @@ def similarity(angle: float, tx: int = 0, ty: int = 0, scale: float = 1.0) -> np
         [0, 0, 1]], np.float32)
     return mat33
 
-class ImageWarper:
-    def __init__(self, matrix, input_shape, output_shape, mode='inverse'):
-        self.matrix = matrix
-        self.input_shape = input_shape
-        self.output_shape = output_shape
-        self.mode = mode
-        self.warp_table = self._precompute_warp_table()
+def compute_homography(pts1: Union[Array, List[Tuple[int, int]]], pts2: Union[Array, List[Tuple[int, int]]],\
+                        use_ransac: bool = False, ransac_threshold: float = 5.0, ransac_iterations: int = 1000) -> Array:
+    if isinstance(pts1, List): pts1 = np.array(pts1, dtype=float)
+    if isinstance(pts2, List): pts2 = np.array(pts2, dtype=float)
+    assert(type(pts1)==type(pts2)), "Two pts1 and pts2 must be same type."
+    assert(is_array(pts1) and is_array(pts2)), "pts must be Array type."
+    assert(pts1.shape[0] >= 4), f"To compute homograpy, correspondence pairs must be larger than 4, but got {pts1.shape[0]}"
 
-    def _precompute_inverse_warp_table(self):
-        height, width = self.output_shape
-        inv_matrix = np.linalg.inv(self.matrix)
-        warp_table = np.zeros((height, width, 2), dtype=np.float32)
+    if is_tensor(pts1):
+        assert(pts1.device == pts2.device), "Two tensor must be same on device."
 
-        for y in range(height):
-            for x in range(width):
-                src_coords = np.dot(inv_matrix, [x, y, 1])
-                src_coords /= src_coords[2]
-                warp_table[y, x] = src_coords[:2]
+    def _normalize_points(pts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Normalize the points so that the mean is 0 and the average distance is sqrt(2).
+        """
 
-        return warp_table
+        centroid = np.mean(pts, axis=0)
+        centered_pts = pts - centroid
+        scale = np.sqrt(2) / np.mean(np.linalg.norm(centered_pts, axis=1))
+        transform = np.array([[scale, 0, -scale * centroid[0]],
+                              [0, scale, -scale * centroid[1]],
+                              [0, 0, 1]])
+        normalized_points = np.dot(transform, np.concatenate((pts.T, np.ones((1, pts.shape[0])))))
+        
+        return normalized_points.T, transform
+    
+    def _compute_homography_from_points(pts1: np.ndarray, pts2: np.ndarray) -> np.ndarray:
+        A = []
+        for i in range(pts1_norm.shape[0]):
+            x1, y1 = pts1[i,0],pts1[i,1]
+            x2, y2 = pts2[i,0],pts2[i,1]
+            A.append([-x1, -y1, -1, 0, 0, 0, x2 * x1, x2 * y1, x2])
+            A.append([0, 0, 0, -x1, -y1, -1, y2 * x1, y2 * y1, y2])
+        A = np.array(A)
+        _, _, Vt = svd(A)
+        H = Vt[-1].reshape((3, 3))
+        return H
 
-    def _precompute_forward_warp_table(self):
-        height, width = self.input_shape
-        warp_table = np.zeros((height, width, 2), dtype=np.float32)
+    # check whether pts1 and pts2 are tensor     
+    device = pts1.device if is_tensor(pts1) else None
 
-        for y in range(height):
-            for x in range(width):
-                dst_coords = np.dot(self.matrix, [x, y, 1])
-                dst_coords /= dst_coords[2]
-                if 0 <= dst_coords[0] < self.output_shape[1] and 0 <= dst_coords[1] < self.output_shape[0]:
-                    warp_table[y, x] = dst_coords[:2]
+    if device is not None:
+        pts1 = convert_numpy(pts1)
+        pts2 = convert_numpy(pts2)
 
-        return warp_table
+    pts1_norm, T1 = _normalize_points(pts1)
+    pts2_norm, T2 = _normalize_points(pts2)
 
-    def _precompute_warp_table(self):
-        if self.mode == 'inverse':
-            return self._precompute_inverse_warp_table()
-        elif self.mode == 'forward':
-            return self._precompute_forward_warp_table()
-        else:
-            raise ValueError("Mode should be either 'inverse' or 'forward'")
-
-    def _apply_warp_table(self, image):
-        height, width = self.output_shape
-        if(len(image.shape) == 3):
-            warped_image = np.zeros((height, width, image.shape[2]), dtype=image.dtype)
-        else:
-            warped_image = np.zeros((height, width), dtype=image.dtype)
+    if pts1.shape[0] > 4 and use_ransac:
+        best_inliers = 0
+        best_homography = None
+        for _ in range(ransac_iterations):
+            indices = random.sample(range(pts1.shape[0]), 4)
+            H_candidate = _compute_homography_from_points(pts1_norm[indices], pts2_norm[indices])
+            H_candidate_denorm = dot(inv(T2), dot(H_candidate, T1))
             
+            inliers = 0
+            for i in range(pts1.shape[0]):
+                pt1_homog = np.append(pts1[i], 1)
+                estimate_pt2 = np.dot(H_candidate_denorm, pt1_homog)
+                estimate_pt2 /= estimate_pt2[2]
+                error = np.linalg.norm(estimate_pt2[:2] - pts2[i])
+                if error < ransac_threshold:
+                    inliers += 1
+            
+            if inliers > best_inliers:
+                best_inliers = inliers
+                best_homography = H_candidate_denorm
+        
+        if best_homography is not None:
+            best_homography /= best_homography[2, 2]
+            return best_homography
 
-        for y in range(height):
-            for x in range(width):
-                src_x, src_y = self.warp_table[y, x]
-                if 0 <= src_x < image.shape[1] and 0 <= src_y < image.shape[0]:
-                    warped_image[y, x] = image[int(src_y), int(src_x)]
+    # Compute Homography using SVD decomposition without RANSAC
+    H = _compute_homography_from_points(pts1_norm, pts2_norm)
+    H = dot(inv(T2), dot(H, T1))
+    H /= H[2, 2]
+    
+    # convert numpy to tensor
+    if device is not None: H = torch.tensor(H, device=device)
+    return H
 
-        return warped_image
+def apply_transform(image: np.ndarray, transform: np.ndarray, output_size: Tuple[int, int], inverse: bool = True) -> np.ndarray:
+    """
+    Apply a perspective transformation to the given image.
 
-    def __call__(self, image):
-        return self._apply_warp_table(image)
+    Parameters:
+    image (np.ndarray): input image array.
+    transform (np.ndarray): 3x3 transformation matrix applied in image coordinates.
+    output_size (Tuple[int, int]): (width, height) of the output image.
+    inverse (bool): Boolean flag to indicate whether to perform inverse warping (default) or forward warping.
+
+    Returns:
+    np.ndarray: The transformed image 
+    """
+    assert transform.shape == (3, 3), "Transformation matrix must be a 3x3 matrix."
+    transform = transform if inverse else inv(transform)
+
+    return cv.warpPerspective(image, transform, output_size)
+
+def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: np.ndarray) -> np.ndarray:
+    """
+    Transition the view from one camera to another with a specified transformation matrix.
+    
+    Parameters:
+    image (np.ndarray): The input image array from the source camera.
+    src_cam (Camera): Source camera object with get_rays method.
+    dst_cam (Camera): Destination camera object with project_pixel method.
+    transform (np.ndarray): A 3x3 transformation matrix applied in normalized coordinates.
+
+    Returns:
+    np.ndarray: The output image transformed and projected onto the destination camera's resolution.
+    """
+    
+    out_width,out_height = dst_cam.resolution
+    # Prepare the output image array
+    if len(image) == 3:
+        output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
+    else:
+        output_image = np.zeros((out_height, out_width), dtype=image.dtype)
+
+    output_rays = dst_cam.get_rays() # 3 * N
+
+    # Apply inverse transform
+    transformed_rays = matmul(inv(transform), output_rays) # 3 * N
+
+    # project ray onto source camera
+    input_coords = src_cam.project_rays(transformed_rays,out_subpixel=True) # 2 * N
+    
+    # Split coordinates
+    input_x, input_y = input_coords[0, :], input_coords[1, :]
+    
+    if image.ndim == 3:
+        # For multi-channel images, handle each channel separately
+        for c in range(image.shape[2]):
+            output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+    else:
+        # For single-channel images
+        output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+
+    return output_image

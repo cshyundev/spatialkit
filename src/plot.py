@@ -80,11 +80,64 @@ def draw_line_by_line(image:np.ndarray, line: Tuple[float,float,float],
         x0,y0 = map(int, [0, -line[2]/line[1] ])
         x1,y1 = map(int, [w, -(line[2]+line[0]*w)/line[1]])
     return cv.line(image,(x0,y0), (x1,y1), rgb, thickness)
+
+def draw_polygon(image: np.ndarray, pts: Union[List[Tuple[int, int]],np.ndarray],\
+                 rgb:Tuple[int,int,int]=None, thickness:int=3) -> np.ndarray:
+    """
+    Draws a polygon on the image based on provided points using OpenCV.
+
+    Parameters:
+        image (np.ndarray): The input image on which the polygon will be drawn.
+        pts (Union[List[Tuple[int, int]],np.ndarray]): List of points (x, y) that define the vertices of the polygon.
+
+    Returns:
+        np.ndarray: The image with the drawn polygon.
+    """
+
+    # Assert that the points list is not empty and each point is a tuple of two integers
+    assert len(pts) >= 3, "There must be at least three points to form a polygon."
+    if isinstance(pts,list): 
+        assert all(isinstance(pt, tuple) and len(pt) == 2 for pt in pts), "Each point must be a tuple of two integers."
+
+    points_array = np.array(pts, dtype=np.int32).reshape((-1, 1, 2))
     
+    if rgb is None: rgb = (0,255,0) # default color = green
+    cv.polylines(image, [points_array], isClosed=True, color=rgb, thickness=thickness)
+    
+    return image
+
 def show_image(image:np.ndarray, title:str="image"):
     plt.imshow(image)
     plt.title(title)
     plt.show()
+
+def show_two_images(image1:np.ndarray, image2:np.ndarray, title1:str="Left image", title2:str="Right image"):
+    """
+    Displays two images side by side with titles using matplotlib.
+
+    Parameters:
+        image1 (np.ndarray): First image to display.
+        image2 (np.ndarray): Second image to display.
+        title1 (str): Title for the first image.
+        title2 (str): Title for the second image.
+    """
+    
+    # Create a figure to hold the subplots
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))  # 1 row, 2 columns
+    
+    # Display the first image
+    axes[0].imshow(image1)
+    axes[0].set_title(title1)
+    axes[0].axis('off')  # Turn off axis numbers and ticks
+
+    # Display the second image
+    axes[1].imshow(image2)
+    axes[1].set_title(title2)
+    axes[1].axis('off')  # Turn off axis numbers and ticks
+
+    plt.tight_layout()  # Adjust subplots to give some padding between them
+    plt.show()
+
 
 if __name__ == "__main__":
     from file_utils import write_image

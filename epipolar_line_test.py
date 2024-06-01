@@ -40,8 +40,12 @@ def main(unused_args):
     # [0., 0.,   1.]]
 
     image_size = [0,0] # width and height
-    K = [[0., 0., 0.],
-        [0., 0.,  0.],
+    fx,fy = (0.,0.) # fx,fy
+    cx,cy = (0.,0.) # cx,cy
+    skew: float = 0. # skew
+
+    K = [[fx,skew,cx],
+        [0., fy,  cy],
         [0., 0.,  1.]]
     dist = [0., 0., 0., 0., 0.] # distortion paremeters k1,k2,p1,p2,k3
 
@@ -77,7 +81,7 @@ def main(unused_args):
     n_pts = 4
     left_pt2d = multiview.choice_points(0,1,n_pts)
     image = multiview.draw_epipolar_line(idx1=0,idx2=1,left_pt2d=left_pt2d)
-    show_image(image)
+    show_image(image,"Epipolar Line Test")
  
 
 if __name__ == "__main__":
