@@ -1,8 +1,8 @@
 from src.hybrid_operations import *
 from scipy.linalg import expm, logm
 
-def norm_l2(x: Array, dim:int, keepdim:bool=True):
-    if is_tensor(x): return torch.norm(x,dim=dim,keepdim=keepdim)    
+def norm_l2(x: Array, dim:int,keepdim:bool=True):
+    if is_tensor(x): return torch.norm(x,dim=dim, keepdim=keepdim)    
     return np.linalg.norm(x,axis=dim,keepdims=keepdim)
 
 def normalize(x: Array, dim: int, eps:float=1e-6) -> Array:
@@ -97,3 +97,12 @@ def svd(x: Array) -> Array:
 def mean(x: Array, dim:int) -> Array:
     if is_tensor(x): return torch.mean(x,dim=dim)
     return np.mean(x,axis=dim)
+
+def inv(x: Array) -> Array:
+    if is_tensor(x): return torch.inverse(x)
+    return np.linalg.inv(x)
+
+def dot(x:Array, y:Array) -> Array:
+    assert(type(x) == type(y)), f"two Array types must be same, but got {str(type(x))} and {str(type(y))}"
+    if is_tensor(x): return torch.dot(x,y)
+    return np.dot(x,y)

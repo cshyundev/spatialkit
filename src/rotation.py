@@ -33,8 +33,6 @@ class RotType(Enum):
         else:
             return RotType.NONE
 
-
-
 def is_SO3(x: Array) -> bool:
     """
     Check given rotation array's type is either SO3 or not.

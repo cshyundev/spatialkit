@@ -1,5 +1,4 @@
 numpy
-torch
 matplotlib
 opencv-python
 tifffile

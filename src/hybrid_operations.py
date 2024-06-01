@@ -41,6 +41,10 @@ def convert_numpy(x: Array) -> ndarray:
     else: raise TypeError
     return x_numpy
 
+def convert_array(x:Any, array:Array) -> Array:
+    if is_tensor(array): return convert_tensor(x,array)
+    return np.array(x)
+
 def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor=None) -> Dict[Any,Tensor]:
     for key in dict.keys():
         if is_numpy(dict[key]): dict[key] = convert_tensor(dict[key], tensor)
@@ -61,7 +65,7 @@ def concat(x: List[Array], dim: int) -> Array:
 def stack(x: List[Array], dim:int) -> Array:
      if is_tensor(x[0]): return torch.stack(x, dim=dim)
      return np.stack(x, axis=dim)
-
+  
 def ones_like(x: Array) -> Array:
     assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")
     if is_tensor(x): return torch.ones_like(x)

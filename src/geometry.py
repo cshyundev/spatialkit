@@ -1,6 +1,7 @@
 import numpy as np
 
 from src.hybrid_operations import *
+from src.hybrid_operations import Array
 from src.pose import Pose
 from src.camera import *
 from src.file_utils import *
@@ -31,12 +32,13 @@ def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=Non
     return mesh
 
 
+
 class MultiView:
     """
     Multiview Geometry
     
     Available Contents
-    Epipolar Line: TODO
+    Epipolar Line: epipolar_line_test.py
     make point clouds: TODO
     """
     def __init__(self,
@@ -46,14 +48,21 @@ class MultiView:
                 depth_path: Optional[List[str]]=None,
                 normal_path: Optional[List[str]]=None
                 ) -> None:
-        
+        assert(len(image_path) == len(cameras) and len(image_path) == len(poses)), "Number of images, camera, and poses must be same."
+        if depth_path is not None:
+            assert(len(image_path) == len(depth_path)), "Number of images and these depth must be same."
+        if normal_path is not None:
+            assert(len(image_path) == len(normal_path)), "Number of images and these normal must be same."
+            
+
         self.image_path = image_path
         self.cameras = cameras
         self.poses = poses
         self.depth_path = depth_path
         self.normal_path = normal_path
-        
-        self.n_views = len(cameras)      
+        self.n_views = len(cameras)
+
+        self.has_depth = True if len(self.depth_path) != 0 else False
                 
     @staticmethod
     def from_meta_data(
@@ -198,6 +207,9 @@ class MultiView:
     def get_image(self, idx:int) -> np.ndarray:
         return read_image(self.image_path[idx])
     
+    def get_camera(self, idx:int) -> Camera:
+        return self.cameras[idx]
+
     def __normalize_points(self, pts: Array) -> Tuple[np.ndarray,np.ndarray]:
         """
         Normalize the points so that the mean is 0 and the average distance is sqrt(2).
@@ -243,7 +255,8 @@ class MultiView:
         H /= H[-1, -1]
         
         return H
-        
+
+
     
 # if __name__ == '__main__':
     
