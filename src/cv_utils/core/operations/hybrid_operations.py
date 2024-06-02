@@ -38,12 +38,12 @@ def convert_tensor(x: Array, tensor: Tensor = None) -> Tensor:
 def convert_numpy(x: Array) -> ndarray:  
     if is_tensor(x): x_numpy = x.detach().cpu().numpy()
     elif is_numpy(x): x_numpy = x
-    else: raise TypeError
+    else: x_numpy = np.array(x)
     return x_numpy
 
 def convert_array(x:Any, array:Array) -> Array:
     if is_tensor(array): return convert_tensor(x,array)
-    return np.array(x)
+    return convert_numpy(x)
 
 def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor=None) -> Dict[Any,Tensor]:
     for key in dict.keys():

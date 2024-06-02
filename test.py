@@ -1,20 +1,25 @@
-from src.rotation import *
-from src.hybrid_operations import *
-from src.hybrid_math import *
-from src.file_utils import *
-from src.camera import PinholeCamera, Camera
-from src.geometry import *
-from src.solutions.mvs.parser import parse_monosdf_dataset
-import numpy as np
 import absl.app as app
-from cv2 import undistortPoints
-from numpy.testing import assert_almost_equal
-from src.camera import PinholeCamera
-from src.image_transform import *
-from src.plot import show_image
-from time import time
+import cv_utils.core.operations.hybrid_operations as hop
+import cv_utils.core.operations.hybrid_math as hm
+import numpy as np
 
 def main(unused_args):
+
+    M = np.array([[1, 0, 0, 0, 2],
+                  [0, 0, 3, 0, 0],
+                  [0, 0, 0, 0, 0],
+                  [0, 2, 0, 0, 0]], dtype=np.float32)
+
+    u,s,vt = hm.svd(M)
+
+    print(u.shape)
+    print(s.shape)
+    print(vt.shape)
+
+    print(np.diag(s).shape)
+
+    print(u @ np.diag(s) @ vt)
+
 
     return None
 

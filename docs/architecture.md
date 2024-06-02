@@ -58,6 +58,9 @@ cv_utils/
 |
 ├── README.md
 ├── LICENSE
+├── features/ # executable codes 
+├── scripts/  # shell scripts
+|
 └── setup.py
 ```
 

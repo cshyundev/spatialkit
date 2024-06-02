@@ -6,6 +6,9 @@ setup(
     description='A utility library for computer vision',
     author='Sehyun Cha',
     author_email='cshyundev@gmail.com',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
+    url="https://github.com/cshyundev/cv_utils",
     packages=find_packages(where='src'),  
     package_dir={'': 'src'}, 
     install_requires=[

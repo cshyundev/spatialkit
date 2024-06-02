@@ -6,6 +6,15 @@ test.ipynb
 .vscode/
 __pycache__
 .gitmessage.txt
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.bak
+*.tmp
+*.egg-info
+dist/
+build/
 
 ## images and files
 /replica
