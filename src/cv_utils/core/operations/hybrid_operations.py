@@ -45,10 +45,15 @@ def convert_array(x:Any, array:Array) -> Array:
     if is_tensor(array): return convert_tensor(x,array)
     return convert_numpy(x)
 
+def _assert_same_type(arrays: Tuple[Array, ...]):
+    assert all(is_tensor(arr) for arr in arrays) or all(is_numpy(arr) for arr in arrays), "All input arrays must be of the same type"
+
 def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor=None) -> Dict[Any,Tensor]:
+    _assert_same_type(dict)
+    new_dict = {}
     for key in dict.keys():
-        if is_numpy(dict[key]): dict[key] = convert_tensor(dict[key], tensor)
-    return dict
+        new_dict[key] = convert_tensor(dict[key], tensor)
+    return new_dict
 
 def expand_dim(x: Array, dim: int) -> Array:
     if is_tensor(x): return x.unsqueeze(dim)
@@ -59,12 +64,14 @@ def reduce_dim(x: Array, dim: int) -> Array:
     else: return np.squeeze(x, axis=dim)
 
 def concat(x: List[Array], dim: int) -> Array:
+    _assert_same_type(x)
     if is_tensor(x[0]): return torch.cat(x, dim=dim)
     return np.concatenate(x, axis=dim)
 
 def stack(x: List[Array], dim:int) -> Array:
-     if is_tensor(x[0]): return torch.stack(x, dim=dim)
-     return np.stack(x, axis=dim)
+    _assert_same_type(x)
+    if is_tensor(x[0]): return torch.stack(x, dim=dim)
+    return np.stack(x, axis=dim)
   
 def ones_like(x: Array) -> Array:
     assert is_array(x), ("Invalid Type. It is neither Numpy nor Tensor.")
@@ -86,6 +93,10 @@ def where(condition:Array, x:Array, y:Array) -> Array:
 def clip(x:Array, min:float=None,max:float=None) -> Array:
     if is_tensor(x): return torch.clip(x,min,max)
     return np.clip(x,min,max)
+
+def eye(n:int, x: Array) -> Array:
+    if is_tensor(x): return torch.eye(n)
+    return np.eye(n)
 
 def as_int(x:Array,n:int=32) -> Array:
     if is_tensor(x):
@@ -114,3 +125,29 @@ def as_float(x:Array, n:int=32) -> Array:
         elif n == 32: return x.astype(np.float32)
         elif n == 16: return x.astype(np.float16)
         else: raise TypeError
+
+def logical_or(*arrays: Array) -> Array:
+    assert len(arrays) > 0, "At least one input array is required"
+    _assert_same_type(arrays)
+
+    result = arrays[0]
+    for arr in arrays[1:]:
+        if is_tensor(result):
+            result = torch.logical_or(result, arr)
+        else:
+            result = np.logical_or(result, arr)
+
+    return result
+
+def logical_and(*arrays: Array) -> Array:
+    assert len(arrays) > 0, "At least one input array is required"
+    _assert_same_type(arrays)
+
+    result = arrays[0]
+    for arr in arrays[1:]:
+        if is_tensor(result):
+            result = torch.logical_and(result, arr)
+        else:
+            result = np.logical_and(result, arr)
+
+    return result 

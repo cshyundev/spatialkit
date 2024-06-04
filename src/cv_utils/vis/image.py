@@ -1,27 +1,25 @@
-from src.hybrid_operations import *
-from src.hybrid_math import *
 import matplotlib.pyplot as plt
+import numpy as np
+from typing import *
 import cv2 as cv
 
-def is_image(image:Array) -> bool:
+def is_image(image:np.ndarray) -> bool:
     if len(image.shape) != 3: return False
     if image.shape[0] == 3 or image.shape[-1] == 3: return True
-    return False 
+    return False
 
-def convert_image(image: Array) -> Array:
+def convert_image(image: np.ndarray) -> np.ndarray:
     assert (is_image(image)), (f"Invalid Shape. Image's shape must be (H,W,3) or (3,H,W).")
-    image = convert_numpy(image)
     if image.shape[0] == 3: # (3,H,W)
-        image = permute(image, (2,0,1)) # (H,W,3)
+        image = np.transpose(image, (2,0,1)) # (H,W,3)
     if image.dtype != np.uint8:
         image = image * 255
         image = image.astype(np.uint8)
     return image
 
 # convert float to color image such as gray or depth
-def float_to_image(v:Array,min_v:float=None,max_v:float=None, color_map:str='magma') -> np.ndarray:
-    if len(v.shape) == 3: v = reduce_dim(v,dim=2)
-    v = convert_numpy(v)
+def float_to_image(v:np.ndarray,min_v:float=None,max_v:float=None, color_map:str='magma') -> np.ndarray:
+    if len(v.shape) == 3: v = np.squeeze(v)
     if min_v is None: min_v = v.min()
     if max_v is None: max_v = v.max()
     v = np.clip(v,min_v,max_v)
@@ -32,17 +30,16 @@ def float_to_image(v:Array,min_v:float=None,max_v:float=None, color_map:str='mag
     return color_mapped
 
 # openGL coordinate mapping
-def normal_to_image(normal: Array) -> np.ndarray:
+def normal_to_image(normal: np.ndarray) -> np.ndarray:
     assert len(normal.shape) == 3 or normal.shape[-1] == 3
-
-    normal = convert_numpy(normal)
     r = (normal[:,:,0] + 1) / 2.0 # (H,W,3)
     g = (-normal[:,:,1] + 1) / 2.0
     b = (-normal[:,:,2] + 1) / 2.0
     color_mapped = convert_image(np.stack((r, g, b), -1)) 
     return color_mapped
 
-def concat_images(images:List[Array], vertical:bool=False):
+# TODO
+def concat_images(images:List[np.ndarray], vertical:bool=False):
         concated_image = convert_image(images[0]) 
         for image in images[1:]:
             if vertical: concated_image = concat([concated_image, convert_image(image)],0)
@@ -137,10 +134,3 @@ def show_two_images(image1:np.ndarray, image2:np.ndarray, title1:str="Left image
 
     plt.tight_layout()  # Adjust subplots to give some padding between them
     plt.show()
-
-
-if __name__ == "__main__":
-    from file_utils import write_image
-    normal = np.random.rand(480,480,1)*100
-    color_normal = float_to_image(normal)
-    write_image(color_normal, "/home/sehyun/normal.png")

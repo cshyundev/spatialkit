@@ -1,36 +1,25 @@
 import numpy as np
 
-from src.hybrid_operations import *
-from src.hybrid_operations import Array
-from src.pose import Pose
-from src.camera import *
-from src.file_utils import *
-from src.plot import * 
-import open3d as o3d 
+from ..operations.hybrid_operations import *
+from pose import Pose
+from tf import Transform
+from camera import *
 from typing import *
 import os.path as osp
 import matplotlib.pyplot as plt 
 
-def make_point_cloud(pt3d: Array, colors: Optional[Array]=None, save_path:str=None):
-    pt3d = convert_numpy(pt3d)
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pt3d)
-    if colors is not None:
-        colors = convert_numpy(colors)
-        pcd.colors = o3d.utility.Vector3dVector(colors)
-    if save_path: o3d.io.write_point_cloud(save_path, pcd)
-    return pcd
 
-def make_mesh(vertices:Array, triangles:Array, vertex_colors:Optional[Array]=None, save_path:str=None):
-    vertices, triangles = convert_numpy(vertices),convert_numpy(triangles)
-    mesh = o3d.geometry.TriangleMesh()
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
-    mesh.triangles = o3d.utility.Vector3iVector(triangles)
-    if vertex_colors is not None:
-        mesh.vertex_colors = convert_numpy(vertex_colors)
-    if save_path: o3d.io.write_triangle_mesh(save_path, mesh)
-    return mesh
+"""
+TODO
+1. essential matrix
+2. fundamental matrix
+3. relative transform(?) 
+4. solve pnp 2D-3D Matching
+5. ICP (3D-3D Matching, or 2D-2D Matching) 이건 후순위
+6. recover transform (두 이미지 매칭쌍으로 부터 상대 포즈 구하기)
+7. triangulation
 
+"""
 
 
 class MultiView:

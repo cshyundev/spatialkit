@@ -1,9 +1,8 @@
 import numpy as np
 from typing import *
-from src.hybrid_operations import *
 import tifffile
 import skimage.io as skio
-from skimage import img_as_float32
+from skimage import img_as_float
 import json
 import yaml
 from PIL import Image
@@ -18,7 +17,7 @@ def read_float(path: str) -> np.ndarray:
             num_datas = len(multi_datas.pages)
             if num_datas == 0: raise Exception("No Images.")
             elif num_datas == 1: data = multi_datas.pages[0].asarray().squeeze()
-            else: data = concat([expand_dim(x.asarray(),0) for x in multi_datas.pages], 0)
+            else: data = np.concatenate([np.expand_dim(x.asarray(),0) for x in multi_datas.pages], 0)
         else:
             raise Exception("No Support Extension.")
     except Exception as e:
@@ -27,8 +26,7 @@ def read_float(path: str) -> np.ndarray:
         data = None
     return data    
 
-def write_float(x:Array, path:str):
-    data = convert_numpy(x)
+def write_float(data:np.ndarray, path:str):
     extension = path.split(sep=".")[-1]
     try:
         if extension == "npy":
@@ -47,15 +45,15 @@ def read_image(path: str, as_float:bool=False) -> np.ndarray:
     try:
         image = skio.imread(path)
         if as_float:
-             image = img_as_float32(image) # normalize [0,255] -> [0.,1.]
+             image = img_as_float(image) # normalize [0,255] -> [0.,1.]
         return image 
     except Exception as e:
         print("reading image failed.")
         return None
 
-def write_image(image:Array, path: str):
+def write_image(image:np.ndarray, path: str):
     if len(image.shape) == 3 and image.shape[-1]== 1:
-        image = reduce_dim(image,-1)
+        image = np.squeeze(image)
     pil_image = Image.fromarray(image)
     extension = path.split(sep=".")[-1]
     pil_image.save(path, extension)
@@ -86,10 +84,3 @@ def read_yaml(path:str) -> Dict[str, Any]:
 def write_yaml(path:str, dict:Dict[str,Any]):
     with open(path,"w") as f:
         yaml.dump(dict,f)
-
-
-# if __name__ == '__main__':
-#     dataset_path = "/home/sehyun/workspace/Replica/scan1/meta_data.json"
-#     # print(osp.exists(dataset_path))
-#     json_dict = read_json(dataset_path)
-#     print(json_dict)

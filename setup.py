@@ -20,7 +20,8 @@ setup(
         'open3d',
         'scikit-image',
         'matplotlib',
-        'torch'
+        'torch',
+        'rich'
     ],
     python_requires='>=3.6',
 )

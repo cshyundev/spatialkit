@@ -1,34 +1,58 @@
 import numpy as np
-from .rotation import Rotation, SO3_to_so3, slerp
-from .hybrid_operations import *
-from .hybrid_math import *
+from rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
+from ..operations.hybrid_operations import *
+from ..operations.hybrid_math import *
 
 
 
 def SE3_to_se3(SE3: Array) -> Array:
-    # covert SE3(matrix) to se3(so3,R^3)
+    """
+    Convert SE3 matrix to se3 vector.
+    Args:
+        SE3: (4,4), float, SE3 transformation matrix
+    Returns:
+        se3: (6,), float, se3 vector
+    """
     R = SE3[:3,:3]
-    t = SE3[3,:]
+    t = SE3[:3,3]
     so3 = SO3_to_so3(R)    
-    se3 = stack([so3, t], dim=0)
+    se3 = concat([so3, t], dim=0)
     return se3
+
+def se3_to_SE3(se3: Array) -> Array:
+    """
+    Convert se3 vector to SE3 matrix.
+    Args:
+        se3: (6,), float, se3 vector (3 for so3 and 3 for translation)
+    Returns:
+        SE3: (4,4), float, SE3 transformation matrix
+    """
+    assert se3.shape == (6,), 'se3 vector must be of shape (6,)'
+
+    so3 = se3[:3]
+    t = se3[3:]
+
+    R = so3_to_SO3(so3)
+    SE3 = eye(4,se3)
+    SE3[:3, :3] = R
+    SE3[:3, 3] = t
+
+    return SE3
 
 class Pose:
     """
-        Rigid Transfrom Class
-        Basically Save Camera Coord. to World Coord. Transform
-    
-        Notation
-        - T: normally means tranformation (tr & rot)
-        - t: normally means translation
-        - rot: normally means rotation
-        - c: normally means scale factor
+    Pose Class representing a 3D pose with position(x,y,z) and orientation.
+    This class encapsulates both the translation and rotation components of a pose.
+
+    Attributes:
+        t (np.ndarray): Translation vector of shape (1, 3)
+        rot (Rotation): Rotation instance represented by a Rotation object
     """
     def __init__(self, t:Array = None, rot:Rotation = None):
         """
         Initialization Pose Instance
         Args:
-            t: [n,3], float, translation
+            t: (1,3), float, translation
             Rotation: Rotation Instance
         """
         if t is None: t = np.array([0.,0.,0.])
@@ -38,31 +62,10 @@ class Pose:
         assert(type(t) == rot.type), ('Rotation and Tranlsation must be same array type(Tensor or Numpy).')
         assert(t.size == 3), ('size of translation must be 3.')
 
-        if t.shape == (3,):
-            t = t.reshape(1,3)
+        if t.shape == (3,): t = t.reshape(1,3)
         
         self.t:Array = t
-        self.rot:Rotation = rot
-        
-    def get_origin_direction(self, rays: Array):
-        """
-        get camera origin and direction vectors from rays(camera coordinates)
-        Args:
-            rays: (3,n), float, ray from camera origin
-        Return:
-            origin: (n,3), float, camera origin in world coord. origin = t
-            direction: (n,3), float, direction vector in world coord. direction = R.T*rays
-        """
-        assert len(rays.shape) <= 2 and rays.shape[0] == 3, "Invalid Shape. Ray's shape must be (n,3) or (3)"
-        if len(rays.shape) == 2:
-            n_rays = rays.shape[1]
-        else:
-            rays = expand_dim(rays, 1)
-            n_rays = 1
-        origin = np.tile(self.t, (n_rays,1))
-        if is_tensor(rays): origin = convert_tensor(origin, rays)
-        direction = transpose2d(self.rot.apply_pts3d(rays)).reshape((-1,3)) 
-        return origin, direction        
+        self.rot:Rotation = rot      
     
     @staticmethod
     def from_rot_vec_t(rot_vec: Array, t:Array) -> 'Pose':
@@ -99,7 +102,7 @@ class Pose:
     
     def rot_vec_t(self):
         return self.rot.so3(), self.t
-        
+    
     def skew_t(self):
         return vec3_to_skew(self.t)
     
@@ -110,22 +113,6 @@ class Pose:
         R_inv = self.rot.inverse()
         t_inv = -R_inv.apply_pts3d(transpose2d(self.t))
         return Pose(transpose2d(t_inv), R_inv)
-
-    def merge(self, pose:'Pose') -> 'Pose':
-        """
-        |R t||R' t'| = |RR' Rt' + t|
-        |0 1||0  1 |   |0       1  |
-        """   
-        mat4 = self.mat44()@pose.mat44() 
-        t = mat4[:3,3]
-        rot = Rotation.from_mat3(mat4[:3,:3])
-        return Pose(t, rot)
-    
-    def apply_pts3d(self, pts3d: Array) -> Array:
-        # P' = R@P + t
-        p = self.rot.apply_pts3d(pts3d)
-        if is_tensor(pts3d): return p + convert_tensor(self.t, pts3d)
-        return p + convert_numpy(self.t) 
 
 def interpolate_pose(p1:Pose,p2:Pose,t:float) -> Pose:
     """
@@ -139,7 +126,7 @@ def interpolate_pose(p1:Pose,p2:Pose,t:float) -> Pose:
     Return:
         Interpolated Pose
     """
-    r=slerp(p1.rot,p2.rot,t)
+    r = slerp(p1.rot,p2.rot,t)
     trans1, trans2 = p1.t, p2.t
     trans = trans1 * (1.- t) + trans2 * t
     return Pose(t=trans,rot=r)

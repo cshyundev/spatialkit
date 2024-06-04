@@ -1,23 +1,15 @@
-import numpy as np
-from .hybrid_operations import *
-from .hybrid_math import *
-from scipy.spatial.transform import Rotation as R
+from ..operations.hybrid_operations import *
+from ..operations.hybrid_math import *
+from cv_utils.constant import PI
 from enum import Enum
 
-# The lists of available rotation parameterization
-ROT_TYPES = [
-    'SO3',  # SO(3): Special orthogonal group 
-    'so3',  # so(3): axis angle
-    'quat_xyzw', # Quaternion with 'xyzw' ordering
-    'quat_wxyz', # Quaternion with 'wxyz' ordering
-    # 'rpy'   # Roll-Pitch-Yaw, Note that Ordering is matter # TODO
-]
 
 class RotType(Enum):
     SO3 = ("SO3", "SO(3): Special orthogonal group")
     so3 = ("so3", "so(3): Lie Algebra of SO(3)")
     QUAT_XYZW = ("QUAT_XYZW", "Quaternion with 'xyzw' ordering")
     QUAT_WXYZ = ("QUAT_WXYZ", "Quaternion with 'wxyz' ordering")
+    RPY = ("RPY", "Roll-Pitch-Yaw (Euler Angles)")
     NONE = ("NONE", "NoneType")
 
     @staticmethod
@@ -29,42 +21,46 @@ class RotType(Enum):
         elif type_str == 'QUAT_XYZW':
             return RotType.QUAT_XYZW
         elif type_str == 'QUAT_WXYZ':
-            return RotType.QUAT_XYZW
+            return RotType.QUAT_WXYZ
         else:
             return RotType.NONE
 
 def is_SO3(x: Array) -> bool:
     """
     Check given rotation array's type is either SO3 or not.
-    If the type is SO3, the shape of array is (n,3,3) or (3,3)
+    If the type is SO3, the shape of array is (3,3)
     """
     shape = x.shape
-    if len(shape) <= 1 or len(shape) > 3: return False # invalid shape
-
-    # [3,3] or [n,3,3]
-    return shape[-2] == 3 and shape[-1] == 3 
+    if shape != (3,3): return False # invalid shape
 
 def is_so3(x: Array) -> bool:
     """
     Check given rotation array's type is either so3 or not.
-    If the type is SO3, the shape of array is (n,3) or (3)
+    If the type is SO3, the shape of array is (3,)
     """
     shape = x.shape
     if len(shape) > 2: return False # invalid shape
 
-    # [3,3] or [n,3,3]
     return shape[-1] == 3 
 
 def is_quat(x: Array) -> bool:
     """
     Check given rotation array's type is either quaternion or not.
-    If the type is Quaternion, the shape of array is (n,4) or (4)
+    If the type is Quaternion, the shape of array is (4,)
     """
     shape = x.shape
     if len(shape) > 2: return False # invalid shape
 
     # [4] or [n,4]
     return shape[-1] == 4
+
+def is_rpy(x: Array) -> bool:
+    """
+    Check given rotation array's type is either RPY or not.
+    If the type is RPY, the shape of array is (3,)
+    """
+    shape = x.shape
+    return len(shape) == 1 and shape[0] == 3
 
 def so3_to_SO3(so3: Array) -> Array:
     """
@@ -84,10 +80,10 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
     """
         Transform Quaternion to Rotation Matrix(SO3)
         Args:
-            quat:(4), float, quaternion
-            is_xyzw:scalar, bool, quat is real part first. Otherwise, real part is last channel
+            quat:(4,), float, quaternion
+            is_xyzw: bool, quat is real part first. Otherwise, real part is last channel
         return:
-            Mat:(n,3,3), float, Rotation Matrix
+            Mat:(3,3), float, Rotation Matrix
     """
     if is_xyzw: # real part last
         x, y, z, w = quat[0],quat[1],quat[2],quat[3] 
@@ -114,8 +110,45 @@ def quat_to_SO3(quat: Array, is_xyzw: bool) -> Array:
 
     return rotation_matrix
 
+def rpy_to_SO3(rpy: Array) -> Array:
+    """
+    Transform RPY (Roll, Pitch, Yaw) to Rotation Matrix (SO3)
+    Args:
+        rpy: (3,), float, RPY angles
+    return:
+        Mat: (3,3), float, Rotation Matrix
+    """
+    assert is_rpy(rpy), (f"Invalid Shape. RPY must be (3,), but got {str(rpy.shape)}")
+    roll, pitch, yaw = rpy
+
+    # Calculate rotation matrix components
+    cr = cos(roll)
+    sr = sin(roll)
+    cp = cos(pitch)
+    sp = sin(pitch)
+    cy = cos(yaw)
+    sy = sin(yaw)
+
+    m00 = cy * cp
+    m01 = cy * sp * sr - sy * cr
+    m02 = cy * sp * cr + sy * sr
+
+    m10 = sy * cp
+    m11 = sy * sp * sr + cy * cr
+    m12 = sy * sp * cr - cy * sr
+
+    m20 = -sp
+    m21 = cp * sr
+    m22 = cp * cr
+
+    # Create the rotation matrix
+    rotation_matrix = convert_array([[m00, m01, m02],
+                             [m10, m11, m12],
+                             [m20, m21, m22]], rpy)
+    return rotation_matrix 
+
 def SO3_to_so3(SO3: Array) -> Array:
-    assert(is_SO3(SO3)), (f"Invaild Shape. SO3 must be (3,3), but got {str(so3.shape)}")
+    assert(is_SO3(SO3)), (f"Invaild Shape. SO3 must be (3,3), but got {str(SO3.shape)}")
     
     theta = arcos((trace(SO3) - 1.)*0.5)
     vec = 0.5 / sin(theta) * stack([SO3[2,1]-SO3[1,2],SO3[0,2] - SO3[2,0],SO3[1,0] - SO3[0,1]], 0)   
@@ -154,7 +187,38 @@ def SO3_to_quat(SO3: Array) -> Array:
         y = (r23 + r32) / S
         z = 0.25 * S
 
-    return np.array([w, x, y, z])
+    return concat([w, x, y, z],dim=0)
+
+def SO3_to_rpy(SO3: Array) -> Array:
+    """
+    Transform Rotation Matrix (SO3) to RPY (Roll, Pitch, Yaw)
+    Args:
+        SO3: (3,3), float, Rotation Matrix
+    return:
+        rpy: (3,), float, RPY angles
+    """
+    assert is_SO3(SO3), (f"Invalid Shape. SO3 must be (3,3), but got {str(SO3.shape)}")
+
+    # Extract rotation matrix components
+    m00, m01, m02 = SO3[0, 0], SO3[0, 1], SO3[0, 2]
+    m10, m11, m12 = SO3[1, 0], SO3[1, 1], SO3[1, 2]
+    m20, m21, m22 = SO3[2, 0], SO3[2, 1], SO3[2, 2]
+
+    # Calculate RPY angles
+    if m20 != 1 and m20 != -1:
+        pitch = -arcsin(m20)
+        roll = arctan2(m21 / cos(pitch), m22 / cos(pitch))
+        yaw = arctan2(m10 / cos(pitch), m00 / cos(pitch))
+    else:
+        yaw = 0
+        if m20 == -1:
+            pitch = PI / 2
+            roll = yaw + arctan2(m01, m02)
+        else:
+            pitch = -PI / 2
+            roll = -yaw + arctan2(-m01, -m02)
+
+    return convert_array([roll, pitch, yaw], SO3)
 
 class Rotation:
     """
@@ -162,53 +226,56 @@ class Rotation:
     - if SO3(Rotation matrix), shape must be [3, 3]
     - if so3(axis angle), shape must be [3]
     - if quat(Quaternion), shape must be [4]
+    - if rpy (Roll-Pitch-Yaw), shape must be [3]
     - default type is SO3 and default shape is [3, 3]
-    """
-    # class ROTATION_TYPE:
-    #     SO3       = 0x0001 # SO(3) Rotation Matrix
-    #     so3       = 0x0002 # so(3) axis angle
-    #     QUAT_XYZW = 0x0003 # Quaternion with 'xyzw' ordering
-    #     QUAT_WXYZ = 0x0004 # Quaternion with 'wxyz' ordering    
-    def __init__(self, data: Array, type_str: str) -> None:
+    """  
+    def __init__(self, data: Array, rot_type: RotType) -> None:
         
         assert is_array(data)
         assert len(data.shape) < 3 # invalid data shape        
-        assert type_str in ROT_TYPES # invalid type string
+        assert rot_type in RotType, "Invalid type string" # invalid type string
         
-        if type_str == 'SO3':
+        if rot_type == RotType.SO3:
             if is_SO3(data) is False: 
                 raise Exception(f'Invalid Shape Error. SO3 must be (n,3,3) or (3,3), but got {data.shape}')
             else: self.data = data
-        elif type_str == 'so3':
+        elif rot_type == RotType.so3:
             if is_so3(data) is False:
                 raise Exception(f'Invalid Shape Error. so3 must be (n,3) or (3), but got {data.shape}')
             self.data = so3_to_SO3(data) 
-        elif type_str == 'quat_xyzw' or type_str == 'quat_wxyz':
+        elif rot_type == RotType.QUAT_XYZW or rot_type == RotType.QUAT_WXYZ:
             if is_quat(data) is False:
                 raise Exception(f'Invalid Shape Error. Quaternion must be (n,4) or (4), but got {data.shape}')
-            self.data = quat_to_SO3(data, type_str=='quat_xyzw')        
-    
+            self.data = quat_to_SO3(data, rot_type==RotType.QUAT_XYZW)        
+        elif rot_type == RotType.RPY:
+            if is_rpy(data) is False:
+                raise Exception(f'Invalid Shape Error. RPY must be (3,), but got {data.shape}')
+            self.data = rpy_to_SO3(data)
+        
     # constructor
     @staticmethod
     def from_mat3(mat3: Array):
-        return Rotation(mat3, 'SO3')
+        return Rotation(mat3, RotType.SO3)
     @staticmethod
     def from_so3(so3: Array):
-        return Rotation(so3, 'so3')
+        return Rotation(so3, RotType.so3)
     @staticmethod
     def from_quat_xyzw(quat: Array):
-        return Rotation(quat, 'quat_xyzw')
+        return Rotation(quat, RotType.QUAT_XYZW)
     @staticmethod
     def from_quat_wxyz(quat: Array):
-        return Rotation(quat, 'quat_wxyz')
-    
-    def to_tensor(self, device: Any = 'cpu') -> None:
-        if is_numpy(self.data): self.data = torch.tensor(self.data,dtype=torch.float32, device=device)        
-        if is_tensor(self.data): self.data = self.data.to(device)
-
+        return Rotation(quat, RotType.QUAT_WXYZ)
+    @staticmethod
+    def from_rpy(rpy: Array):
+        return Rotation(rpy, RotType.RPY)
+        
     @property
     def type(self):
         return type(self.data)
+    
+    @property
+    def dtype(self):
+        return self.dtype
     
     def mat(self):
         return self.data
@@ -220,7 +287,7 @@ class Rotation:
         return SO3_to_quat(self.data)
     
     def apply_pts3d(self, pts3d: Array):
-        ## R*pt3d: [3,3] * [3,n]
+        ## R*pts3d: [3,3] * [3,n]
         assert pts3d.shape[0] == 3, f"Invalid Shape. pts3d's shape should be (3,n), but got {str(pts3d.shape)}."
         mat = self.mat()
         if is_tensor(pts3d): mat = convert_tensor(mat,pts3d)        
@@ -234,13 +301,17 @@ class Rotation:
     def inverse(self) -> 'Rotation':
         return Rotation.from_mat3(self.inverse_mat())
     
-    def dot(self, rot:'Rotation') -> 'Rotation':
+    def _dot(self, rot:'Rotation') -> 'Rotation':
         rot1_mat = self.mat()
         rot2_mat = rot.mat()
-        if is_tensor(rot1_mat): rot2_mat = convert_tensor(rot2_mat,rot1_mat)    
+        rot2_mat = convert_array(rot2_mat,rot1_mat)
         rot_mat = matmul(rot1_mat,rot2_mat)
         return Rotation.from_mat3(rot_mat)
 
+    def __mul__(self, other: 'Rotation') -> 'Rotation':
+        if not isinstance(other, Rotation):
+            raise ValueError("Multiplication is only supported between Rotation instances")
+        return self._dot(other)
 
 def slerp(r1:Rotation,r2:Rotation, t:float):
     """

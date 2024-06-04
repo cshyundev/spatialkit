@@ -1,17 +1,13 @@
 import numpy as np
 from typing import *
-from src.hybrid_operations import *
-from src.hybrid_math import *
-from src.camera import Camera
+from ..operations.hybrid_operations import *
+from ..operations.hybrid_math import *
+from camera import Camera
+from tf import Transform
 from scipy.ndimage import map_coordinates
 import cv2 as cv
 import random
 
-
-def make_pixel_grid(width:int, height:int) -> np.ndarray:
-    u,v = np.meshgrid(range(width), range(height))
-    uv = concat([u.reshape((1,-1)), v.reshape((1,-1))], 0)
-    return uv
 
 def translation(tx: int = 0, ty: int = 0) -> np.ndarray:
     """
@@ -29,22 +25,41 @@ def translation(tx: int = 0, ty: int = 0) -> np.ndarray:
         [0, 0, 1]], np.float32)
     return mat33
 
-def rotation(angle: float) -> np.ndarray:
+def rotation(angle: float, center: tuple = (0, 0)) -> np.ndarray:
     """
-    Rotation transformation matrix
+    Rotation transformation matrix around a given center point.
 
     Args:
         angle (float): Rotation angle in degrees.
+        center (tuple): The center point (cx, cy) to rotate around.
     Returns:
-        Rotation transformation matrix
+        np.ndarray: Rotation transformation matrix.
     """
+    cx, cy = center
     rad = np.deg2rad(angle)
     cos_a = np.cos(rad)
     sin_a = np.sin(rad)
-    mat33 = np.array([
+    
+    # Translation to origin
+    T1 = np.array([
+        [1, 0, -cx],
+        [0, 1, -cy],
+        [0, 0, 1]], np.float32)
+    
+    # Rotation
+    R = np.array([
         [cos_a, -sin_a, 0],
         [sin_a, cos_a, 0],
         [0, 0, 1]], np.float32)
+    
+    # Translation back to the center
+    T2 = np.array([
+        [1, 0, cx],
+        [0, 1, cy],
+        [0, 0, 1]], np.float32)
+    
+    # Combined transformation
+    mat33 = T2 @ R @ T1
     return mat33
 
 def shear(shx: float = 0, shy: float = 0) -> np.ndarray:
@@ -200,34 +215,77 @@ def apply_transform(image: np.ndarray, transform: np.ndarray, output_size: Tuple
 
     return cv.warpPerspective(image, transform, output_size)
 
-def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: np.ndarray) -> np.ndarray:
-    """
-    Transition the view from one camera to another with a specified transformation matrix.
+# def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: np.ndarray) -> np.ndarray:
+#     """
+#     Transition the view from one camera to another with a specified transformation matrix.
     
+#     Parameters:
+#     image (np.ndarray): The input image array from the source camera.
+#     src_cam (Camera): Source camera object with get_rays method.
+#     dst_cam (Camera): Destination camera object with project_pixel method.
+#     transform (np.ndarray): A 3x3 transformation matrix applied in normalized coordinates.
+
+#     Returns:
+#     np.ndarray: The output image transformed and projected onto the destination camera's resolution.
+#     """
+    
+#     out_width,out_height = dst_cam.resolution
+#     # Prepare the output image array
+#     if len(image) == 3:
+#         output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
+#     else:
+#         output_image = np.zeros((out_height, out_width), dtype=image.dtype)
+
+#     output_rays = dst_cam.get_rays() # 3 * N
+
+#     # Apply inverse transform
+#     transformed_rays = matmul(inv(transform), output_rays) # 3 * N
+
+#     # project ray onto source camera
+#     input_coords = src_cam.project_rays(transformed_rays,out_subpixel=True) # 2 * N
+    
+#     # Split coordinates
+#     input_x, input_y = input_coords[0, :], input_coords[1, :]
+    
+#     if image.ndim == 3:
+#         # For multi-channel images, handle each channel separately
+#         for c in range(image.shape[2]):
+#             output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+#     else:
+#         # For single-channel images
+#         output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+
+#     return output_image
+
+def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: Transform) -> np.ndarray:
+    """
+    Transition the view from one camera to another with a specified transformation.
+
     Parameters:
     image (np.ndarray): The input image array from the source camera.
     src_cam (Camera): Source camera object with get_rays method.
     dst_cam (Camera): Destination camera object with project_pixel method.
-    transform (np.ndarray): A 3x3 transformation matrix applied in normalized coordinates.
+    transform (Transform): A Transform object applied in normalized coordinates.
 
     Returns:
     np.ndarray: The output image transformed and projected onto the destination camera's resolution.
     """
     
-    out_width,out_height = dst_cam.resolution
+    out_width, out_height = dst_cam.resolution
     # Prepare the output image array
-    if len(image) == 3:
+    if image.ndim == 3:
         output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
     else:
         output_image = np.zeros((out_height, out_width), dtype=image.dtype)
 
-    output_rays = dst_cam.get_rays() # 3 * N
+    output_rays = dst_cam.get_rays()  # 3 * N
 
     # Apply inverse transform
-    transformed_rays = matmul(inv(transform), output_rays) # 3 * N
+    inverse_transform = transform.inverse()
+    transformed_rays = inverse_transform.apply_pts3d(output_rays)  # 3 * N
 
-    # project ray onto source camera
-    input_coords = src_cam.project_rays(transformed_rays,out_subpixel=True) # 2 * N
+    # Project ray onto source camera
+    input_coords = src_cam.project_rays(transformed_rays, out_subpixel=True)  # 2 * N
     
     # Split coordinates
     input_x, input_y = input_coords[0, :], input_coords[1, :]

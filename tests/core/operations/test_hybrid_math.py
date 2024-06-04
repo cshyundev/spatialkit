@@ -4,6 +4,39 @@ import unittest
 from cv_utils.core.operations.hybrid_math import *
 
 class TestHybridMath(unittest.TestCase):
+    
+    def test_polyval(self):
+        # Test 1: Simple polynomial evaluation
+        coeffs = np.array([2, 0, -1])  # Corresponds to 2x^2 - 1
+        x = np.array([0, 1, 2])
+        expected = np.array([-1, 1, 7])  # 2*0^2 - 1 = -1, 2*1^2 - 1 = 1, 2*2^2 - 1 = 7
+        result = polyval(coeffs, x)
+        np.testing.assert_array_equal(result, expected)
+
+        # Test 2: Polynomial evaluation with different coefficients
+        coeffs = np.array([1, -3, 2])  # Corresponds to x^2 - 3x + 2
+        x = np.array([0, 1, 2, 3])
+        expected = np.array([2, 0, 0, 2])  # x^2 - 3x + 2 evaluated at [0, 1, 2, 3]
+        result = polyval(coeffs, x)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_polyfit(self):
+        # Test 1: Simple linear fit
+        x = np.array([0, 1, 2, 3])
+        y = np.array([1, 3, 5, 7])  # Corresponds to y = 2x + 1
+        degree = 1
+        expected = np.array([2, 1])  # Coefficients [2, 1] for 2x + 1
+        result = polyfit(x, y, degree)
+        np.testing.assert_almost_equal(result, expected, decimal=6)
+
+        # Test 2: Quadratic fit
+        x = np.array([-1, 0, 1, 2])
+        y = np.array([1, 0, 1, 4])  # Corresponds to y = x^2
+        degree = 2
+        expected = np.array([1, 0, 0])  # Coefficients [1, 0, 0] for x^2
+        result = polyfit(x, y, degree)
+        np.testing.assert_almost_equal(result, expected, decimal=6)
+    
     def test_svd(self):
         # Test with NumPy array
         x_np = np.random.rand(3, 3)

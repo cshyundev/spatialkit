@@ -24,7 +24,7 @@ def dot(x: Array, y: Array) -> Array:
 
 def svd(x: Array) -> Array:
     assert x.ndim == 2, f"Invalid shape for SVD: expected a 2D matrix, but got {x.shape}."
-    if is_tensor(x): return torch.svd(x)
+    if is_tensor(x): return torch.linalg.svd(x)
     return np.linalg.svd(x)
 
 def determinant(x: Array) -> float:
@@ -82,6 +82,11 @@ def vec3_to_skew(x: Array) -> Array:
     if is_tensor(x): skew_x = convert_tensor(skew_x, x)
     return skew_x
 
+def diag(x: Array) -> Array:
+    assert x.ndim == 2, f"Invalid shape for diag: expected a 2D array, but got {x.shape}."
+    if is_tensor(x): return torch.diag(x)
+    return np.diag(x)
+
 # Transform and Permutation
 def rad2deg(x: Array) -> Array:
     return x * (180. / np.pi)
@@ -123,3 +128,19 @@ def arctan(x: Array) -> Array:
 def arctan2(x: Array) -> Array:
     if is_tensor(x): return torch.arctan2(x)
     return np.arctan2(x)
+
+# Polynomial functions
+def polyval(coeffs: Array, x: Array) -> Array:
+    y = zeros_like(x)
+    for c in coeffs:
+        y = y * x + c
+    return y
+
+def polyfit(x: Array, y: Array, degree: int) -> Array:
+    if is_tensor(x):
+        x_np = convert_numpy(x)
+        y_np =  convert_numpy(y)
+        coeffs_np = np.polyfit(x_np, y_np, degree)
+        return convert_tensor(coeffs_np,x)
+    else:
+        return np.polyfit(x, y, degree)
