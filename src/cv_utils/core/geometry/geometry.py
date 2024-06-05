@@ -15,10 +15,9 @@ TODO
 2. fundamental matrix
 3. relative transform(?) 
 4. solve pnp 2D-3D Matching
-5. ICP (3D-3D Matching, or 2D-2D Matching) 이건 후순위
 6. recover transform (두 이미지 매칭쌍으로 부터 상대 포즈 구하기)
 7. triangulation
-
+8. ICP (3D-3D Matching, or 2D-2D Matching) 이건 후순위
 """
 
 

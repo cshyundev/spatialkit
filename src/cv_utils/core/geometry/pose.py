@@ -64,8 +64,12 @@ class Pose:
 
         if t.shape == (3,): t = t.reshape(1,3)
         
-        self.t:Array = t
+        self._t:Array = t
         self.rot:Rotation = rot      
+    
+    @property
+    def t(self) -> Array:
+        return self._t
     
     @staticmethod
     def from_rot_vec_t(rot_vec: Array, t:Array) -> 'Pose':
@@ -130,31 +134,19 @@ def interpolate_pose(p1:Pose,p2:Pose,t:float) -> Pose:
     trans1, trans2 = p1.t, p2.t
     trans = trans1 * (1.- t) + trans2 * t
     return Pose(t=trans,rot=r)
-    
-if __name__ == '__main__':
-    rot = [  0.9958109, -0.0487703,  0.0773446,
-           0.0526372,  0.9974220, -0.0487703,
-          -0.0747667,  0.0526372,  0.9958109 ]
-    rot = Rotation.from_mat3(np.array(rot).reshape(3,3))
-    t1 = np.array([1.,2.,3.])
-    t2 = np.array([2.,3.,4.])
-    
-    # cam1tow = Pose(t1,rot) # cam1 to world
-    # cam2tow = Pose(t2,rot) # cam2 to world
-    # rel = cam2tow.inverse().merge(cam1tow) # cam1 to cam2
-    # print(rel.mat34())
-    # cam1tow_mat = cam1tow.mat44()
-    # wtocam2_mat = cam2tow.inverse().mat44()
-    # rel_mat = wtocam2_mat@cam1tow_mat 
-    # print(rel_mat)
-    p = Pose(t1,rot)
-    skew_t = p.skew_t()
-    print(vec3_to_skew(t1))
-    # print(skew_t)
-    
 
-
-
+def relative_pose(pose1: Pose, pose2: Pose) -> Pose:
+    """
+    Calculate the relative pose from pose1 to pose2.
+    Args:
+        pose1: Pose, the first pose (reference pose)
+        pose2: Pose, the second pose
+    Returns:
+        Pose, the relative pose from pose1 to pose2
+    """
+    pose1_inv = pose1.inverse()
     
+    rel_rot = pose1_inv.rot * pose2.rot
+    rel_t = pose1_inv.t + pose1_inv.rot.apply_pts3d(pose2.t)
     
-    
+    return Pose(rel_t, rel_rot)    
