@@ -76,7 +76,7 @@ def write_json(path:str, dict:Dict[str,Any], indent:int=1):
 def read_yaml(path:str) -> Dict[str, Any]:
     try:
         with open(path,"r") as f:
-            dict = yaml.load(f)
+            dict = yaml.load(f,Loader=yaml.FullLoader)
         return dict
     except:
         raise Exception("Reading yaml file failed.")

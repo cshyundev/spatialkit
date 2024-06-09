@@ -1,6 +1,6 @@
 from .hybrid_operations import *
 from scipy.linalg import expm
-from cv_utils.constant import EPSILON
+from ...constant import EPSILON
 
 # Basic Mathematical Operations
 def abs(x: Array) -> Array:
@@ -144,3 +144,34 @@ def polyfit(x: Array, y: Array, degree: int) -> Array:
         return convert_tensor(coeffs_np,x)
     else:
         return np.polyfit(x, y, degree)
+
+# Linear-Algebra Problem
+def is_square(x: Array) -> bool:
+    return x.ndim == 2 and x.shape[0] == x.shape[1]
+
+def solve(A:Array, b: Array) -> Array:
+    assert(type(A) == type(b)), "Two Array must be same type."
+    if is_tensor(A): return torch.linalg.solve(A,b)
+    return np.linalg.solve(A,b)
+
+def solve_linear_system(A:Array, b: Array = None):
+    """
+    Solve the linear system Ax = b or find the null space if b is None.
+    Efficient for small linear systems but may be adapted for larger systems with appropriate libraries.
+
+    Args:
+    A: Array or Tensor representing the coefficient matrix.
+    b: Optional; Array or Tensor representing the dependent variable vector. If None, find null space of A.
+
+    Returns:
+    Array or Tensor: Solution vector or null space basis vectors.
+    """
+    if b is not None:
+        # Ax = b 
+        return solve(A,b)    
+    else:
+        # Ax = 0
+        # use svd
+        _,s,vt = svd(A)
+        null_space = transpose2d(vt)[:, s < EPSILON]
+        return null_space

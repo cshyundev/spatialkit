@@ -2,11 +2,11 @@ from glob import glob
 from typing import Dict, Any
 import os.path as osp
 import numpy as np
-from .file_utils import *
+# from .file_utils import *
 import cv2 as cv
 
 def parse_monosdf_dataset(dataset_path:str,
-                          center_crop_type:str,
+                          center_crop_type:str="center_crop_for_replica",
                           cam_type:str="PINHOLE", margin:float=0.):
     """
     Parse  monosdf dataset to dictionary

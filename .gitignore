@@ -24,3 +24,4 @@ build/
 /garage_*
 train_trajectory.txt
 /Replica
+!/images/*

@@ -1,6 +1,6 @@
 # 프로젝트 아키텍처 및 의존성 문서
 
-**최종 수정 날짜:** 2024년 6월 1일  
+**최종 수정 날짜:** 2024년 6월 8일  
 **버전:** v0.1.0
 
 이 문서는 프로젝트의 아키텍처 구조와 각 패키지의 역할 및 의존성에 대해 설명한다. 이 정보는 프로젝트의 설계 의도를 이해하고, 각 구성요소 간의 상호작용을 파악하는 데 도움을 준다.
@@ -13,48 +13,50 @@
 ```text
 cv_utils/
 ├── src/
-│   ├── core/  # Core modules for 3D Geometry and data processing
-│   │   ├── operations/  # Modules for operations
-│   │   │   ├── __init__.py
-│   │   │   ├── hybrid_operations.py  # Basic operations for array types
-│   │   │   └── hybrid_math.py        # Mathematical operations for array types
-│   │   │
-│   │   └── geometry/ # Modules for 3D Geometry
-│   │      ├── __init__.py
-│   │      ├── rotation.py           # Classes related to 3D rotations
-│   │      ├── pose.py               # Classes related to 3D poses
-│   │      ├── tf.py                 # Classes for 3D transformations (TBD)
-│   │      ├── camera.py             # Classes related to camera models
-│   │      ├── image_transform.py    # 2D image transformation functions
-│   │      └── geometry_utils.py     # 3D geometric operations
-│   │   
-│   ├── utils/  # General utility modules
-│   │   ├── logger.py (TBD) 
-│   │   └── file_utils.py  
-│   │
-│   ├── vis/  # Modules for visualization
-│   │   └── image_edit.py
-│   │
-│   ├── metrics/  # Modules for evaluation metrics
-│   │   └── error_metrics.py 
-│   │
-│   ├── externals/  
-│   │   ├── o3d/
-│   │   │   ├── __init__.py
-│   │   │   └── mesh_operations.py    # Mesh operations(TBD)
-│   │   │
-│   │   └── colmap/  # Modules using PyCOLMAP
-│   │       ├── __init__.py
-│   │       └── stereo_matching.py    # Stereo matching (TBD)
-│   │
-│   └── solutions/  # Modules using previous packages for specific tasks (TBD)
-│      ├── marker/  # Modules related to fiducial markers (TBD)
-│      │   ├── __init__.py
-│      │   └── marker.py  # Classes related to 3D rotations
-│      │
-│      └── multiview/  # Modules for multi-view stereo (TBD)
-│          ├── __init__.py
-│          └── reconstruction.py    
+|   └── cv_utils/
+|      ├── core/  # Core modules for 3D Geometry and data processing
+|      │   ├── operations/  # Modules for operations
+|      │   │   ├── __init__.py
+|      │   │   ├── hybrid_operations.py  # Basic operations for array types
+|      │   │   └── hybrid_math.py        # Mathematical operations for array types
+|      │   │
+|      │   └── geometry/ # Modules for 3D Geometry
+|      │      ├── __init__.py
+|      │      ├── rotation.py           # Classes related to 3D rotations
+|      │      ├── pose.py               # Classes related to 3D poses
+|      │      ├── tf.py                 # Classes for 3D transformations
+|      │      ├── camera.py             # Classes related to camera models
+|      │      ├── image_transform.py    # 2D image transformation functions
+|      │      └── geometry_utils.py     # 3D geometric operations
+|      │   
+|      ├── utils/  # General utility modules
+|      │   ├── logger.py 
+|      │   └── file_utils.py  
+|      │
+|      ├── vis/  # Modules for visualization
+|      │   ├── point_selector.py
+|      │   └── image_utils.py
+|      │
+|      ├── metrics/  # Modules for evaluation metrics
+|      │   └── error_metrics.py 
+|      │
+|      ├── externals/  
+|      │   ├── o3d/
+|      │   │   ├── __init__.py
+|      │   │   └── mesh_operations.py    # Mesh operations(TBD)
+|      │   │
+|      │   └── colmap/  # Modules using PyCOLMAP
+|      │       ├── __init__.py
+|      │       └── stereo_matching.py    # Stereo matching (TBD)
+|      │
+|      └── solutions/  # Modules using previous packages for specific tasks (TBD)
+|         ├── marker/  # Modules related to fiducial markers (TBD)
+|         │   ├── __init__.py
+|         │   └── marker.py  # Classes related to 3D rotations
+|         │
+|         └── multiview/  # Modules for multi-view stereo (TBD)
+|             ├── __init__.py
+|             └── reconstruction.py    
 |
 ├── README.md
 ├── LICENSE

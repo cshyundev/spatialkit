@@ -1,6 +1,6 @@
 import numpy as np
-from rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
-from pose import Pose
+from .rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
+from .pose import Pose
 from ..operations.hybrid_operations import *
 from ..operations.hybrid_math import *
 
@@ -181,7 +181,7 @@ class Transform:
         Returns:
             Array: Transformed 3D points
         """
-        t = convert_array(self, pts3d)
+        t = transpose2d(convert_array(self.t, pts3d))
         return self.rot.apply_pts3d(pts3d) + t
 
     def __mul__(self, other):
@@ -214,8 +214,4 @@ def interpolate_transform(t1: Transform, t2: Transform, alpha: float) -> Transfo
     r = slerp(t1.rot, t2.rot, alpha)
     trans1, trans2 = t1.t, t2.t
     trans = trans1 * (1. - alpha) + trans2 * alpha
-    return Transform(t=trans, rot=r)
-
-    
-    
-    
+    return Transform(t=trans, rot=r) 

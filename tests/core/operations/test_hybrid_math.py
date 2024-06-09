@@ -5,6 +5,57 @@ from cv_utils.core.operations.hybrid_math import *
 
 class TestHybridMath(unittest.TestCase):
     
+    def test_solve_linear_system_with_solution(self):
+        # Define a square, non-singular matrix and a solution vector
+        A_square = np.array([[2, 1], [1, 3]])
+        b = np.array([1, 2])
+        torch_A_square = torch.tensor([[2, 1], [1, 3]], dtype=torch.float32)
+        torch_b = torch.tensor([1, 2], dtype=torch.float32)
+
+        # Test solving a system with a known solution
+        np_result = solve_linear_system(A_square, b)
+        self.assertTrue(np.allclose(np_result, np.linalg.solve(A_square, b)))
+
+        torch_result = solve_linear_system(torch_A_square, torch_b)
+        self.assertTrue(torch.allclose(torch_result, torch.linalg.solve(torch_A_square, torch_b)))
+
+    def test_solve_linear_system_without_solution(self):
+        # Define a non-square matrix
+        A_non_square = np.array([[2, 1], [1, 3], [1, 1]])
+        torch_A_non_square = torch.tensor(A_non_square, dtype=torch.float32)
+
+        # Test finding the null space of a non-square matrix
+        np_result = solve_linear_system(A_non_square)
+        self.assertTrue(isinstance(np_result, np.ndarray))
+        # Verify that all vectors in the null space satisfy A*v = 0
+        for col in np_result.T:
+            self.assertTrue(np.allclose(A_non_square @ col, np.zeros(A_non_square.shape[0])))
+
+        torch_result = solve_linear_system(torch_A_non_square)
+        self.assertTrue(isinstance(torch_result, torch.Tensor))
+        for col in torch_result.t():
+            self.assertTrue(torch.allclose(torch.matmul(torch_A_non_square, col), torch.zeros(A_non_square.shape[0])))
+
+    def test_solve_linear_system_singular_matrix(self):
+        # Define a singular matrix
+        A_singular = np.array([[2, 4], [1, 2]])
+        torch_A_singular = torch.tensor(A_singular, dtype=torch.float32)
+
+        # Test solving a system with a singular matrix
+        np_result = solve_linear_system(A_singular)
+        self.assertTrue(isinstance(np_result, np.ndarray))
+        # Expect the null space to not be empty
+        self.assertGreater(np_result.size, 0)
+        # Verify that all vectors in the null space satisfy A*v = 0
+        for col in np_result.T:
+            self.assertTrue(np.allclose(A_singular @ col, np.zeros(A_singular.shape[0])))
+
+        torch_result = solve_linear_system(torch_A_singular)
+        self.assertTrue(isinstance(torch_result, torch.Tensor))
+        self.assertGreater(torch_result.numel(), 0)
+        for col in torch_result.t():
+            self.assertTrue(torch.allclose(torch.matmul(torch_A_singular, col), torch.zeros(torch_A_singular.shape[0])))
+
     def test_polyval(self):
         # Test 1: Simple polynomial evaluation
         coeffs = np.array([2, 0, -1])  # Corresponds to 2x^2 - 1

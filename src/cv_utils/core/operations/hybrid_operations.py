@@ -1,23 +1,13 @@
 import numpy as np
 from numpy import ndarray
+from torch import Tensor
+import torch
 from typing import *
 
-try:
-    import torch
-    from torch import Tensor
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-    
-    
-if TORCH_AVAILABLE:
-    Array = Union[ndarray, Tensor]
-else:
-    Array = ndarray
+Array = Union[ndarray, Tensor] # Hybrid ArrayType
 
 def is_tensor(x: Array) -> bool:
-    if TORCH_AVAILABLE: return type(x) == Tensor
-    else: return False    
+    return type(x) == Tensor
 
 def is_numpy(x: Array) -> bool:
     return type(x) == ndarray
@@ -26,7 +16,6 @@ def is_array(x: Any) -> bool:
     return is_tensor(x) or is_numpy(x)
 
 def convert_tensor(x: Array, tensor: Tensor = None) -> Tensor:
-    assert TORCH_AVAILABLE
     if is_tensor(x): return x 
     if tensor is not None:    
         assert is_tensor(tensor)
@@ -45,11 +34,11 @@ def convert_array(x:Any, array:Array) -> Array:
     if is_tensor(array): return convert_tensor(x,array)
     return convert_numpy(x)
 
-def _assert_same_type(arrays: Tuple[Array, ...]):
+def _assert_same_array_type(arrays: Tuple[Array, ...]):
     assert all(is_tensor(arr) for arr in arrays) or all(is_numpy(arr) for arr in arrays), "All input arrays must be of the same type"
 
 def convert_dict_tensor(dict: Dict[Any, ndarray], tensor: Tensor=None) -> Dict[Any,Tensor]:
-    _assert_same_type(dict)
+    _assert_same_array_type(dict)
     new_dict = {}
     for key in dict.keys():
         new_dict[key] = convert_tensor(dict[key], tensor)
@@ -64,12 +53,12 @@ def reduce_dim(x: Array, dim: int) -> Array:
     else: return np.squeeze(x, axis=dim)
 
 def concat(x: List[Array], dim: int) -> Array:
-    _assert_same_type(x)
+    _assert_same_array_type(x)
     if is_tensor(x[0]): return torch.cat(x, dim=dim)
     return np.concatenate(x, axis=dim)
 
 def stack(x: List[Array], dim:int) -> Array:
-    _assert_same_type(x)
+    _assert_same_array_type(x)
     if is_tensor(x[0]): return torch.stack(x, dim=dim)
     return np.stack(x, axis=dim)
   
@@ -128,7 +117,7 @@ def as_float(x:Array, n:int=32) -> Array:
 
 def logical_or(*arrays: Array) -> Array:
     assert len(arrays) > 0, "At least one input array is required"
-    _assert_same_type(arrays)
+    _assert_same_array_type(arrays)
 
     result = arrays[0]
     for arr in arrays[1:]:
@@ -141,7 +130,7 @@ def logical_or(*arrays: Array) -> Array:
 
 def logical_and(*arrays: Array) -> Array:
     assert len(arrays) > 0, "At least one input array is required"
-    _assert_same_type(arrays)
+    _assert_same_array_type(arrays)
 
     result = arrays[0]
     for arr in arrays[1:]:

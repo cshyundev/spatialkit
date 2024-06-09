@@ -2,8 +2,8 @@ import numpy as np
 from typing import *
 from ..operations.hybrid_operations import *
 from ..operations.hybrid_math import *
-from camera import Camera
-from tf import Transform
+from .camera import Camera
+from .tf import Transform
 from scipy.ndimage import map_coordinates
 import cv2 as cv
 import random
@@ -115,16 +115,66 @@ def similarity(angle: float, tx: int = 0, ty: int = 0, scale: float = 1.0) -> np
         [0, 0, 1]], np.float32)
     return mat33
 
-def compute_homography(pts1: Union[Array, List[Tuple[int, int]]], pts2: Union[Array, List[Tuple[int, int]]],\
-                        use_ransac: bool = False, ransac_threshold: float = 5.0, ransac_iterations: int = 1000) -> Array:
+def affine(tx: int = 0, ty: int = 0, angle: float = 0, center: tuple = (0, 0), 
+                     sx: float = 1, sy: float = 1, shx: float = 0, shy: float = 0) -> np.ndarray:
+    """
+    Create an affine transformation matrix that combines translation, rotation, scaling, and shearing.
+
+    Args:
+        tx (int): Translation along the x-axis.
+        ty (int): Translation along the y-axis.
+        angle (float): Rotation angle in degrees.
+        center (tuple): Center of rotation (cx, cy).
+        sx (float): Scaling factor along the x-axis.
+        sy (float): Scaling factor along the y-axis.
+        shx (float): Shear factor along the x-axis.
+        shy (float): Shear factor along the y-axis.
+
+    Returns:
+        np.ndarray: The resulting 3x3 affine transformation matrix.
+    """
+    # Calculate radians for rotation
+    rad = np.deg2rad(angle)
+    cos_a = np.cos(rad)
+    sin_a = np.sin(rad)
+    cx, cy = center
+
+    # Translation matrix to center
+    T1 = np.array([[1, 0, -cx],
+                   [0, 1, -cy],
+                   [0, 0, 1]], dtype=np.float32)
+
+    # Rotation matrix
+    R = np.array([[cos_a, -sin_a, 0],
+                  [sin_a, cos_a, 0],
+                  [0, 0, 1]], dtype=np.float32)
+
+    # Scaling matrix
+    S = np.array([[sx, 0, 0],
+                  [0, sy, 0],
+                  [0, 0, 1]], dtype=np.float32)
+
+    # Shear matrix
+    Sh = np.array([[1, shx, 0],
+                   [shy, 1, 0],
+                   [0, 0, 1]], dtype=np.float32)
+
+    # Translation back to the original position
+    T2 = np.array([[1, 0, cx+tx],
+                   [0, 1, cy+ty],
+                   [0, 0, 1]], dtype=np.float32)
+
+    # Combined transformation
+    transform = T2 @ S @ Sh @ R @ T1
+    return transform
+
+def compute_homography(pts1: Union[np.ndarray, List[Tuple[int, int]]], pts2: Union[np.ndarray, List[Tuple[int, int]]],\
+                        use_ransac: bool = False, ransac_threshold: float = 5.0, ransac_iterations: int = 1000) -> np.ndarray:
     if isinstance(pts1, List): pts1 = np.array(pts1, dtype=float)
     if isinstance(pts2, List): pts2 = np.array(pts2, dtype=float)
     assert(type(pts1)==type(pts2)), "Two pts1 and pts2 must be same type."
     assert(is_array(pts1) and is_array(pts2)), "pts must be Array type."
     assert(pts1.shape[0] >= 4), f"To compute homograpy, correspondence pairs must be larger than 4, but got {pts1.shape[0]}"
-
-    if is_tensor(pts1):
-        assert(pts1.device == pts2.device), "Two tensor must be same on device."
 
     def _normalize_points(pts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -152,13 +202,6 @@ def compute_homography(pts1: Union[Array, List[Tuple[int, int]]], pts2: Union[Ar
         _, _, Vt = svd(A)
         H = Vt[-1].reshape((3, 3))
         return H
-
-    # check whether pts1 and pts2 are tensor     
-    device = pts1.device if is_tensor(pts1) else None
-
-    if device is not None:
-        pts1 = convert_numpy(pts1)
-        pts2 = convert_numpy(pts2)
 
     pts1_norm, T1 = _normalize_points(pts1)
     pts2_norm, T2 = _normalize_points(pts2)
@@ -194,7 +237,6 @@ def compute_homography(pts1: Union[Array, List[Tuple[int, int]]], pts2: Union[Ar
     H /= H[2, 2]
     
     # convert numpy to tensor
-    if device is not None: H = torch.tensor(H, device=device)
     return H
 
 def apply_transform(image: np.ndarray, transform: np.ndarray, output_size: Tuple[int, int], inverse: bool = True) -> np.ndarray:
@@ -214,88 +256,3 @@ def apply_transform(image: np.ndarray, transform: np.ndarray, output_size: Tuple
     transform = transform if inverse else inv(transform)
 
     return cv.warpPerspective(image, transform, output_size)
-
-# def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: np.ndarray) -> np.ndarray:
-#     """
-#     Transition the view from one camera to another with a specified transformation matrix.
-    
-#     Parameters:
-#     image (np.ndarray): The input image array from the source camera.
-#     src_cam (Camera): Source camera object with get_rays method.
-#     dst_cam (Camera): Destination camera object with project_pixel method.
-#     transform (np.ndarray): A 3x3 transformation matrix applied in normalized coordinates.
-
-#     Returns:
-#     np.ndarray: The output image transformed and projected onto the destination camera's resolution.
-#     """
-    
-#     out_width,out_height = dst_cam.resolution
-#     # Prepare the output image array
-#     if len(image) == 3:
-#         output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
-#     else:
-#         output_image = np.zeros((out_height, out_width), dtype=image.dtype)
-
-#     output_rays = dst_cam.get_rays() # 3 * N
-
-#     # Apply inverse transform
-#     transformed_rays = matmul(inv(transform), output_rays) # 3 * N
-
-#     # project ray onto source camera
-#     input_coords = src_cam.project_rays(transformed_rays,out_subpixel=True) # 2 * N
-    
-#     # Split coordinates
-#     input_x, input_y = input_coords[0, :], input_coords[1, :]
-    
-#     if image.ndim == 3:
-#         # For multi-channel images, handle each channel separately
-#         for c in range(image.shape[2]):
-#             output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
-#     else:
-#         # For single-channel images
-#         output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
-
-#     return output_image
-
-def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: Transform) -> np.ndarray:
-    """
-    Transition the view from one camera to another with a specified transformation.
-
-    Parameters:
-    image (np.ndarray): The input image array from the source camera.
-    src_cam (Camera): Source camera object with get_rays method.
-    dst_cam (Camera): Destination camera object with project_pixel method.
-    transform (Transform): A Transform object applied in normalized coordinates.
-
-    Returns:
-    np.ndarray: The output image transformed and projected onto the destination camera's resolution.
-    """
-    
-    out_width, out_height = dst_cam.resolution
-    # Prepare the output image array
-    if image.ndim == 3:
-        output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
-    else:
-        output_image = np.zeros((out_height, out_width), dtype=image.dtype)
-
-    output_rays = dst_cam.get_rays()  # 3 * N
-
-    # Apply inverse transform
-    inverse_transform = transform.inverse()
-    transformed_rays = inverse_transform.apply_pts3d(output_rays)  # 3 * N
-
-    # Project ray onto source camera
-    input_coords = src_cam.project_rays(transformed_rays, out_subpixel=True)  # 2 * N
-    
-    # Split coordinates
-    input_x, input_y = input_coords[0, :], input_coords[1, :]
-    
-    if image.ndim == 3:
-        # For multi-channel images, handle each channel separately
-        for c in range(image.shape[2]):
-            output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
-    else:
-        # For single-channel images
-        output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
-
-    return output_image

@@ -86,6 +86,60 @@ class TestHybridOperations(unittest.TestCase):
             list_of_tensors = [self.torch_tensor, self.torch_tensor]
             result = stack(list_of_tensors, 0)
             self.assertEqual(result.shape, (2, 3))
+    
+    def test_logical_or_with_numpy(self):
+        # Test logical_or with NumPy arrays
+        a = np.array([True, False, True])
+        b = np.array([False, False, True])
+        c = np.array([False, True, False])
+        
+        # Expected result using NumPy's logical_or
+        expected = np.logical_or(np.logical_or(a, b), c)
+        result = logical_or(a, b, c)
+        
+        np.testing.assert_array_equal(result, expected)
+
+    def test_logical_or_with_tensors(self):
+        # Test logical_or with PyTorch tensors
+        a = torch.tensor([True, False, True])
+        b = torch.tensor([False, False, True])
+        c = torch.tensor([False, True, False])
+        
+        # Expected result using Torch's logical_or
+        expected = torch.logical_or(torch.logical_or(a, b), c)
+        result = logical_or(a, b, c)
+        
+        self.assertTrue(torch.equal(result, expected))
+
+    def test_logical_and_with_numpy(self):
+        # Test logical_and with NumPy arrays
+        a = np.array([True, False, True])
+        b = np.array([True, False, False])
+        c = np.array([True, True, False])
+        
+        # Expected result using NumPy's logical_and
+        expected = np.logical_and(np.logical_and(a, b), c)
+        result = logical_and(a, b, c)
+        
+        np.testing.assert_array_equal(result, expected)
+
+    def test_logical_and_with_tensors(self):
+        # Test logical_and with PyTorch tensors
+        a = torch.tensor([True, False, True])
+        b = torch.tensor([True, False, False])
+        c = torch.tensor([True, True, False])
+        
+        # Expected result using Torch's logical_and
+        expected = torch.logical_and(torch.logical_and(a, b), c)
+        result = logical_and(a, b, c)
+        
+        self.assertTrue(torch.equal(result, expected))
+
+    def test_input_validation(self):
+        # Test to ensure input validation is working
+        with self.assertRaises(AssertionError):
+            logical_or()  # No input arrays
+            logical_and()  # No input arrays
 
 if __name__ == '__main__':
     unittest.main()

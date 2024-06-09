@@ -1,6 +1,6 @@
 import numpy as np
 
-from cv_utils.constant import PI, EPSILON
+from ...constant import PI
 from ..operations.hybrid_operations import *
 from ..operations.hybrid_math import *
 from enum import Enum
@@ -13,6 +13,7 @@ class CamType(Enum):
     EQUIDISTANT = ("EQUIDISTANT", "Equidistant Camera Type")
     THINPRISM = ("THINPRISIM", "Thin Prism Fisheye Camera Type")
     EQUIRECT = ("EQUIRECT", "Equirectangular Camera Type")
+    ORTHOGRAPHIC = ("ORTHOGRAPHIC", "Orthographic Camera Type")
     NONE = ("NONE", "No Camera Type")
     
     @staticmethod
@@ -25,9 +26,12 @@ class CamType(Enum):
             return CamType.EQUIRECT
         elif type_str == 'THINPRISIM':
             return CamType.THINPRISM
+        elif type_str == 'ORTHOGRAPHIC':
+            return CamType.ORTHOGRAPHIC
         else:
             return CamType.NONE
-        
+
+# Camera Interface
 class Camera:
     def __init__(self, cam_dict: Dict[str, Any]):
         self.cam_type = CamType.NONE
@@ -70,9 +74,195 @@ class Camera:
         else:
             raise Exception("Unkwon Camera Type")
 
-class PinholeCamera(Camera):
+# Abstract Class for Radial Camera Model
+class RadialCamera(Camera):
+    def __init__(self,cam_dict: Dict[str,Any]):
+        super.__init__(RadialCamera,cam_dict)
+        self.fx, self.fy = cam_dict['focal_length']
+        self.cx, self.cy = cam_dict['principal_point']
+        self.skew = cam_dict['skew']
+    
+    @property
+    def K(self):
+        K = np.eye(3)
+        K[0,0] = self.fx
+        K[1,1] = self.fy
+        K[0,1] = self.skew
+        K[0,2] = self.cx
+        K[1,2] = self.cy
+        return K
+    
+    @property
+    def inv_K(self):
+        return inv(self.K)
+    
+    @property
+    def fov(self):
+        fov_x = 2 * rad2deg(arctan(self.width / (2 * self.fx))) 
+        fov_y = 2 * rad2deg(arctan(self.height / (2 * self.fy))) 
+        return fov_x, fov_y
+
+    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
+        u = self.fx * x + self.skew * y + self.cx
+        v = self.fy * y + self.cy
+        if use_clip:
+            u = clip(u,0.,float(self.width))
+            v = clip(v,0.,float(self.height))
+        return u,v
+    
+    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
+        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
+        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
+        return x,y
+
+    def _is_distorted(self):
+        raise NotImplementedError
+
+    def _distort(self, x: Array, y: Array, extra: bool=False) \
+            -> Union[Tuple[Array,Array],Tuple[Array,Array,Array,Array]] :
+        raise NotImplementedError
+        
+    def _compute_residual_jacobian(self,xu:Array,yu:Array, xd:Array, yd:Array) \
+            -> Tuple[Array,Array,Array,Array,Array,Array]:
+        raise NotImplementedError        
+        
+        
+    def _undistort(self, xd: Array, yd: Array, err_thr:float, max_iter:int) -> Tuple[Array,Array]:
+        raise NotImplementedError        
+
+    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
+        u = self.fx * x + self.skew * y + self.cx
+        v = self.fy * y + self.cy
+        if use_clip:
+            u = clip(u,0.,float(self.width))
+            v = clip(v,0.,float(self.height))
+        return u,v
+    
+    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
+        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
+        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
+        return x,y
+
+    def get_rays(self,
+                 uv:Array = None, 
+                 norm:bool = True,
+                 out_scale:bool = False
+                 ) -> Array:
+        if uv is None: uv = self.make_pixel_grid() # (2,HW)
+        x,y = self._to_normalized_plane(uv) 
+        if self._is_distorted():
+            x,y = self._undistort(x,y,self.err_thr, self.max_iter)
+        z = ones_like(x)
+        rays = concat([x,y,z], 0) # (3,HW)
+        if norm: rays = normalize(rays,dim=0)
+        if out_scale:
+            depth_scale = rays[2:3,:]
+            return rays, depth_scale
+        return rays # (3,HW)
+    
+    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
+        X = rays[0:1,:]
+        Y = rays[1:2,:]
+        Z = rays[2:3,:]
+        x,y = X / Z, Y / Z
+        if self._is_distorted(): x,y = self._distort(x,y)
+        u,v = self._to_image_plane(x,y)
+        uv = concat([u,v], dim=0)
+        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
+
+    def get_radii(self, uv:Array=None):
+        if uv is None: uv = self.make_pixel_grid()
+        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
+        num_pixels = u.shape[1]
+        uu = concat([u, u+1], dim=1) # (1,2N)
+        vv = concat([v, v+1], dim=1) # (1,2N)
+        xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
+        yy = (vv - self.cy) / self.fy # (1,2N)
+        if self._is_distorted():
+            xx,yy = self._undistort(xx, yy)
+        # dx = x[:,:-1] - x[:,1:]
+        # dx = concat([dx, dx[:,-2:-1]], dim=1)
+        # dy = y[:,-1:] - y[:,1:]
+        # dy = concat([dy, dy[:,-2:-1]],dim=1)
+        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
+        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
+        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
+        return radii.reshape(-1,1) # (HW,1)
+
+    def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
+        if self._is_distorted() is False:
+            return uv
+        
+        x,y = self._to_normalized_plane(uv)
+        xd,yd = self._distort(x,y)
+        u,v = self._to_image_plane(xd,yd,use_clip)
+        uv = concat([u,v], dim=0)
+        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
+
+    def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
+        if self._is_distorted() is False:
+            print("Warning: camera Model is just Pinhole without distortion.")
+            return uv
+
+        x,y = self._to_normalized_plane(uv)        
+        xu,yu = self._undistort(x,y)
+        u,v = self._to_image_plane(xu,yu,use_clip)
+        uv = concat([u,v], dim=0)
+        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
+
+    def undistort_image(self, image:np.ndarray) -> np.ndarray:
+        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
+
+        if self._is_distorted() is False:
+            print("Warning: camera Model is just Pinhole without distortion.")
+            return image
+        if len(image) == 3:
+            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
+        else:
+            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
+        
+        uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
+        # Split coordinates
+        input_x, input_y = uv[0, :], uv[1, :]
+    
+        if image.ndim == 3:
+            # For multi-channel images, handle each channel separately
+            for c in range(image.shape[2]):
+                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
+        else:
+            # For single-channel images
+            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
+        
+        return output_image
+
+    def distort_image(self, image:np.ndarray) -> np.ndarray:
+        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
+
+        if self._is_distorted() is False:
+            return image
+        if len(image) == 3:
+            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
+        else:
+            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
+        
+        uv = self.undistort_pixel(self.make_pixel_grid(),out_subpixel=True)
+        # Split coordinates
+        input_x, input_y = uv[0, :], uv[1, :]
+    
+        if image.ndim == 3:
+            # For multi-channel images, handle each channel separately
+            for c in range(image.shape[2]):
+                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
+        else:
+            # For single-channel images
+            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
+        
+        return output_image
+
+# For Simple Radial Camera Model or small distortion
+class PinholeCamera(RadialCamera):
     """
-    Pinhole Camera Model without distortion Parameters.
+    Pinhole Camera Model.
 
     Attributes:
         cam_type (CamType): Camera type, set to PINHOLE.
@@ -86,13 +276,15 @@ class PinholeCamera(Camera):
     def __init__(self, cam_dict: Dict[str, Any]):
         super(PinholeCamera, self).__init__(cam_dict)
         self.cam_type = CamType.PINHOLE
-        self.fx, self.fy = cam_dict['focal_length']
-        self.cx, self.cy = cam_dict['principal_point']
-        self.skew = cam_dict['skew']
         self.radial_params = cam_dict['radial']
         self.tangential_params = cam_dict['tangential']
         self.err_thr: float = 1e-4
         self.max_iter:int=5
+    
+    @property
+    def dist_coeffs(self):
+        _dist_coeffs = self.radial_params[0:2] + self.tangential_params + self.radial_params[2:3]
+        return np.array(_dist_coeffs)
     
     @staticmethod
     def from_K(K: List[List[float]], image_size:List[int], dist: List[float] = None) -> 'PinholeCamera':
@@ -139,7 +331,7 @@ class PinholeCamera(Camera):
         width,height = image_size
         if type(fov) == float:
             fov_x = fov
-            fov_y = fov * height / width
+            fov_y = fov
         else:
             fov_x, fov_y = fov
         # Calculate focal length based on FOV and image resolution
@@ -162,31 +354,6 @@ class PinholeCamera(Camera):
             'tangential': tangential_params
         }
         return PinholeCamera(cam_dict)
-
-    @property
-    def K(self):
-        K = np.eye(3)
-        K[0,0] = self.fx
-        K[1,1] = self.fy
-        K[0,1] = self.skew
-        K[0,2] = self.cx
-        K[1,2] = self.cy
-        return K
-    
-    @property
-    def inv_K(self):
-        return inv(self.K)
-    
-    @property
-    def fov(self):
-        fov_x = 2 * rad2deg(arctan(self.width / (2 * self.fx))) 
-        fov_y = 2 * rad2deg(arctan(self.height / (2 * self.fy))) 
-        return fov_x, fov_y
-
-    @property
-    def dist_coeffs(self):
-        _dist_coeffs = self.radial_params[0:2] + self.tangential_params + self.radial_params[2:3]
-        return np.array(_dist_coeffs)
 
     def _is_distorted(self):
         cnt = np.count_nonzero(self.radial_params) + np.count_nonzero(self.tangential_params)
@@ -247,7 +414,7 @@ class PinholeCamera(Camera):
         
         return x_res, y_res, x_res_x, x_res_y, y_res_x, y_res_y
         
-    def _undistort(self, xd: Array, yd: Array, err_thr:float, max_iter:int) -> Tuple[Array,Array]:
+    def _undistort(self, xd: Array, yd: Array) -> Tuple[Array,Array]:
         """
         Compute undistorted coords
         Adapted from MultiNeRF
@@ -279,171 +446,21 @@ class PinholeCamera(Camera):
         """
         xu,yu = deep_copy(xd), deep_copy(yd)
         
-        for _ in range(max_iter):
+        for _ in range(self.max_iter):
             rx, ry, rx_x, rx_y, ry_x, ry_y \
                 = self._compute_residual_jacobian(xu, yu, xd, yd)
             if sqrt(rx**2 + ry**2).max() < 1e-4: break
             Det = ry_x * rx_y - rx_x * ry_y
             x_numerator,y_numerator = ry_y*rx-rx_y*ry, rx_x*ry-ry_x*rx
-            step_x = where(abs(Det) > err_thr, x_numerator / Det, zeros_like(Det))
-            step_y = where(abs(Det) > err_thr, y_numerator / Det, zeros_like(Det))
+            step_x = where(abs(Det) > self.err_thr, x_numerator / Det, zeros_like(Det))
+            step_y = where(abs(Det) > self.err_thr, y_numerator / Det, zeros_like(Det))
             xu = xu + clip(step_x,-0.5, 0.5)
             yu = yu + clip(step_y,-0.5, 0.5)
 
         return xu,yu
 
-    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
-        u = self.fx * x + self.skew * y + self.cx
-        v = self.fy * y + self.cy
-        if use_clip:
-            u = clip(u,0.,float(self.width))
-            v = clip(v,0.,float(self.height))
-        return u,v
-    
-    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
-        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
-        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
-        return x,y
-
-    def get_rays(self,
-                 uv:Array = None, 
-                 norm:bool = True,
-                 out_scale:bool = False
-                 ) -> Array:
-        if uv is None: uv = self.make_pixel_grid() # (2,HW)
-        x,y = self._to_normalized_plane(uv) 
-        if self._is_distorted():
-            x,y = self._undistort(x,y,self.err_thr, self.max_iter)
-        z = ones_like(x)
-        rays = concat([x,y,z], 0) # (3,HW)
-        if norm: rays = normalize(rays,dim=0)
-        if out_scale:
-            depth_scale = rays[2:3,:]
-            return rays, depth_scale
-        return rays # (3,HW)
-    
-    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
-        X = rays[0:1,:]
-        Y = rays[1:2,:]
-        Z = rays[2:3,:]
-        x,y = X / Z, Y / Z
-        if self._is_distorted(): x,y = self._distort(x,y)
-        u,v = self._to_image_plane(u,v)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def reprojection_mask(self, rays: Array, uv: Array, reprojection_err_thr: int = 1) -> Array:
-        """
-        Generate a mask based on the reprojection error of rays projected onto the image plane.
-        
-        Args:
-        - rays: (3,N), float, The rays to project, assumed to be normalized.
-        - uv: (2,N), int, The actual image coordinates corresponding to the rays.
-        - reprojection_err_thr: scalar, int, The threshold for reprojection error to decide mask values.
-
-        Returns:
-        - Array, (1,N): A mask array where True represents a reprojection error below the threshold, and False otherwise.
-        """
-        # Project rays onto the image plane to get the reprojected coordinates
-        reprojected_uv = self.project_rays(rays)
-        # Calculate the reprojection error between actual and reprojected coordinates
-        reprojection_err = normalize(reprojected_uv - uv, dim=0)
-        # Generate mask based on the reprojection error threshold
-        return reprojection_err <= reprojection_err_thr
-
-    def get_radii(self, uv:Array=None):
-        if uv is None: uv = self.make_pixel_grid()
-        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
-        num_pixels = u.shape[1]
-        uu = concat([u, u+1], dim=1) # (1,2N)
-        vv = concat([v, v+1], dim=1) # (1,2N)
-        xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
-        yy = (vv - self.cy) / self.fy # (1,2N)
-        if self._is_distorted():
-            xx,yy = self._undistort(xx, yy, self.err_thr, self.max_iter)
-        # dx = x[:,:-1] - x[:,1:]
-        # dx = concat([dx, dx[:,-2:-1]], dim=1)
-        # dy = y[:,-1:] - y[:,1:]
-        # dy = concat([dy, dy[:,-2:-1]],dim=1)
-        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
-        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
-        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
-        return radii.reshape(-1,1) # (HW,1)
-
-    def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
-        if self._is_distorted() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
-            return uv
-        
-        x,y = self._to_normalized_plane(uv)
-        xd,yd = self._distort(x,y)
-        u,v = self._to_image_plane(xd,yd,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
-        if self._is_distorted() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
-            return uv
-
-        x,y = self._to_normalized_plane(uv)        
-        xu,yu = self._undistort(x,y,self.err_thr,self.max_iter)
-        u,v = self._to_image_plane(xu,yu,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if self._is_distorted() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
-            return image
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
-
-    def distort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if self._is_distorted() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
-            return image
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.undistort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
-
-# For OpenCV Fisheye Camera
-class EquidistantCamera(Camera):
+# For OpenCV Fisheye Camera Model
+class EquidistantCamera(RadialCamera):
     """
     Represents an Equidistant (Equiangular) Camera Model, typically used for wide-angle or fisheye lenses.
     This model is characterized by its equidistant projection, where radial distances are proportional to the actual angles.
@@ -459,13 +476,8 @@ class EquidistantCamera(Camera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
-        super(EquidistantCamera, self).__init__(cam_dict)
-        
+        super(EquidistantCamera, self).__init__(cam_dict)      
         self.cam_type = CamType.EQUIDISTANT
-        
-        self.fx, self.fy = cam_dict['focal_length']
-        self.cx, self.cy = cam_dict['principal_point']
-        self.skew = cam_dict['skew']
         self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
         self.err_thr: float = 1e-4
         self.max_iter:int=20
@@ -476,20 +488,6 @@ class EquidistantCamera(Camera):
         else:
             self.poly_coeffs = self._compute_polynomial_coeffs()
       
-    @property
-    def K(self) -> np.ndarray:
-        K = np.eye(3)
-        K[0,0] = self.fx
-        K[1,1] = self.fy
-        K[0,1] = self.skew
-        K[0,2] = self.cx
-        K[1,2] = self.cy
-        return K
-    
-    @property
-    def inv_K(self) -> np.ndarray:
-        return inv(self.K)
-    
     @property
     def dist_coeffs(self):
         return np.array(self.radial_params) 
@@ -515,19 +513,9 @@ class EquidistantCamera(Camera):
             'radial': D
         }
         return EquidistantCamera(cam_dict)
-
-    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
-        u = self.fx * x + self.skew * y + self.cx
-        v = self.fy * y + self.cy
-        if use_clip:
-            u = clip(u,0.,float(self.width))
-            v = clip(v,0.,float(self.height))
-        return u,v
     
-    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
-        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
-        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
-        return x,y
+    def _is_distorted(self):
+        return True
     
     def _distort(self, x: Array, y: Array, extra:bool=False) \
             -> Tuple[Array,Array]:
@@ -591,7 +579,7 @@ class EquidistantCamera(Camera):
         
         return x_res, y_res, x_res_x, x_res_y, y_res_x, y_res_y
 
-    def _undistort(self, xd:Array, yd:Array, err_thr:float, max_iter:int) \
+    def _undistort(self, xd:Array, yd:Array) \
         -> Tuple[Array,Array]:
         
         if self.poly_coeffs is not None:
@@ -600,126 +588,24 @@ class EquidistantCamera(Camera):
             yu = polyval(self.poly_coeffs[1], yd)
         else:        
             xu,yu = deep_copy(xd), deep_copy(yd)
-            for _ in range(max_iter):
+            for _ in range(self.max_iter):
                 rx, ry, rx_x, rx_y, ry_x, ry_y \
                     = self._compute_residual_jacobian(xu, yu, xd, yd)
                 if sqrt(rx**2 + ry**2).max() < 1e-4: break
                 Det = ry_x * rx_y - rx_x * ry_y
                 x_numerator,y_numerator = ry_y*rx-rx_y*ry, rx_x*ry-ry_x*rx
-                step_x = where(abs(Det) > err_thr, x_numerator / Det, zeros_like(Det))
-                step_y = where(abs(Det) > err_thr, y_numerator / Det, zeros_like(Det))
+                step_x = where(abs(Det) > self.err_thr, x_numerator / Det, zeros_like(Det))
+                step_y = where(abs(Det) > self.err_thr, y_numerator / Det, zeros_like(Det))
                 xu = xu + clip(step_x,-0.5, 0.5)
                 yu = yu + clip(step_y,-0.5, 0.5)
         return xu,yu
 
-    def get_rays(self,
-                 uv:Array = None, 
-                 norm:bool = True,
-                 out_scale:bool = False
-                 ) -> Array:
-        if uv is None: uv = self.make_pixel_grid() # (2,HW)
-        xd,yd = self._to_normalized_plane(uv)
-        x,y = self._undistort(xd,yd,self.err_thr, self.max_iter)
-        z = ones_like(x)
-        rays = concat([x,y,z], 0) # (3,HW)
-        if norm: rays = normalize(rays, 0)
-        if out_scale:
-            depth_scale = rays[2:3,:]
-            return rays, depth_scale
-        return rays # (3,HW)
-    
-    def get_radii(self, uv:Array=None):
-        if uv is None: uv = self.make_pixel_grid()
-        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
-        num_pixels = u.shape[1]
-        uu = concat([u, u+1], dim=1) # (1,2N)
-        vv = concat([v, v+1], dim=1) # (1,2N)
-        xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
-        yy = (vv - self.cy) / self.fy # (1,2N)
-        
-        xx,yy = self._undistort(xx, yy, self.err_thr, self.max_iter)
-        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
-        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
-        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
-        return radii.reshape(-1,1) # (HW,1)
-
-    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
-        X = rays[0:1,:]
-        Y = rays[1:2,:]
-        Z = rays[2:3,:]
-        x,y = X / Z, Y / Z
-        x,y = self._distort(x,y)
-        u,v = self._to_image_plane(u,v)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-    
-    def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
-        x,y = self._to_normalized_plane(uv)
-        xd,yd = self._distort(x,y)
-        u,v = self._to_image_plane(xd,yd,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
-        x,y = self._to_normalized_plane(uv)        
-        xu,yu = self._undistort(x,y,self.err_thr,self.max_iter)
-        u,v = self._to_image_plane(xu,yu,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
-
-    def distort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.undistort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
-
-class ThinPrismFisheyeCamera(Camera):
+# For COLMAP Camera Model
+class ThinPrismFisheyeCamera(RadialCamera):
     
     def __init__(self, cam_dict: Dict[str, Any]):
         super(ThinPrismFisheyeCamera, self).__init__(cam_dict)
-        
         self.cam_type = CamType.THINPRISM
-        
-        self.fx, self.fy = cam_dict['focal_length']
-        self.cx, self.cy = cam_dict['principal_point']
         self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
         self.tangential_params = cam_dict['tangential'] # p1,p2
         self.prism_params = cam_dict['prism'] # sx1,sy1
@@ -740,16 +626,12 @@ class ThinPrismFisheyeCamera(Camera):
         return K
     
     @property
-    def inv_K(self) -> np.ndarray:
-        return inv(self.K)
-    
-    @property
     def dist_coeffs(self):
         _dist_coeffs = self.radial_params[0:2] + self.tangential_params + self.radial_params[2:] + self.prism_params
         return np.array(_dist_coeffs)
     
     @staticmethod
-    def from_K_D(K: List[float], image_size:List[int], D: List[float]) -> 'EquidistantCamera':
+    def from_K_D(K: List[float], image_size:List[int], D: List[float]) -> 'ThinPrismFisheyeCamera':
         """
         Static method to create an ThinPrismFisheyeCamera (fisheye) instance from intrinsic matrix and distortion coefficients.
 
@@ -795,18 +677,8 @@ class ThinPrismFisheyeCamera(Camera):
         }
         return ThinPrismFisheyeCamera(cam_dict)
 
-    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
-        u = self.fx * x + self.cx
-        v = self.fy * y + self.cy
-        if use_clip:
-            u = clip(u,0.,float(self.width))
-            v = clip(v,0.,float(self.height))
-        return u,v
-    
-    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
-        x = (uv[0:1,:] - self.cx) / self.fx # (1,HW)
-        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
-        return x,y
+    def _is_distorted(self):
+        return True
     
     def _distort(self, x: Array, y: Array) \
             -> Tuple[Array,Array]:
@@ -851,105 +723,6 @@ class ThinPrismFisheyeCamera(Camera):
         yu = polyval(self.poly_coeffs[1], yd)
        
         return xu,yu
-    
-    def get_rays(self,
-                 uv:Array = None, 
-                 norm:bool = True,
-                 out_scale:bool = False
-                 ) -> Array:
-        if uv is None: uv = self.make_pixel_grid() # (2,HW)
-        xd,yd = self._to_normalized_plane(uv)
-        x,y = self._undistort(xd,yd)
-        z = ones_like(x)
-        rays = concat([x,y,z], 0) # (3,HW)
-        if norm: rays = normalize(rays, 0)
-        if out_scale:
-            depth_scale = rays[2:3,:]
-            return rays, depth_scale
-        return rays # (3,HW)
-    
-    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
-        X = rays[0:1,:]
-        Y = rays[1:2,:]
-        Z = rays[2:3,:]
-        x,y = X / Z, Y / Z
-        x,y = self._distort(x,y)
-        u,v = self._to_image_plane(u,v)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-    
-    def get_radii(self, uv:Array=None):
-        if uv is None: uv = self.make_pixel_grid()
-        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
-        num_pixels = u.shape[1]
-        uu = concat([u, u+1], dim=1) # (1,2N)
-        vv = concat([v, v+1], dim=1) # (1,2N)
-        xx = (uu - self.cx) / self.fx # (1,2N)
-        yy = (vv - self.cy) / self.fy # (1,2N)
-        
-        xx,yy = self._undistort(xx, yy)
-        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
-        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
-        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
-        return radii.reshape(-1,1) # (HW,1)
-    
-    def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
-        x,y = self._to_normalized_plane(uv)
-        xd,yd = self._distort(x,y)
-        u,v = self._to_image_plane(xd,yd,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
-        x,y = self._to_normalized_plane(uv)        
-        xu,yu = self._undistort(x,y)
-        u,v = self._to_image_plane(xu,yu,use_clip)
-        uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
-
-    def undistort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
-
-    def distort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if len(image) == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
-        
-        uv = self.undistort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
-        return output_image
     
 class EquirectangularCamera(Camera):
     """
@@ -1028,4 +801,24 @@ class EquirectangularCamera(Camera):
         phi = (uv[1:2,:] -self.cy) / self.cy * self.phi_scale - self.phi_offset
         radii = 2 * sin(dt_theta) * cos(phi)
         return radii.reshape(-1,1) * 2 / sqrt(12)
+
+# Not Complete
+class OrthographicCamera(Camera):
+    def __init__(self, cam_dict: Dict[str, Any]):
+        super(self,OrthographicCamera).__init__(cam_dict)
+        self.cam_type = CamType.ORTHOGRAPHIC
+
+    def get_rays(self, uv:Array=None) -> Array:
+        if uv is None: uv = self.make_pixel_grid()
+        # 모든 광선이 동일한 방향을 가지고 카메라 평면에 수직
+        direction = np.array([0, 0, 1])  # z축 방향을 예로 듭니다.
+        rays = np.tile(direction, (self.width * self.height, 1))
+        return rays
     
+    def project_rays(self, rays: np.ndarray, out_subpixel:bool=False) -> np.ndarray:
+        # 직교 투영에서는 방향 변화 없이 그대로 광선을 반환
+        return rays
+    
+    def get_radii(self) -> np.ndarray:
+        # 직교 투영의 경우 빛의 집중이나 확산이 없으므로 1로 고정
+        return np.ones((self.width * self.height,))

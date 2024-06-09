@@ -1,5 +1,5 @@
 import numpy as np
-from rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
+from .rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
 from ..operations.hybrid_operations import *
 from ..operations.hybrid_math import *
 
