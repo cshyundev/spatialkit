@@ -7,7 +7,7 @@ from .camera import *
 from typing import *
 import cv2 as cv
 
-def compute_essential_matrix(K1: np.ndarray, K2: np.ndarray,F: Optional[np.ndarray]=None, rel_p:Optional[Union[Pose,Transform]]=None) -> np.ndarray:
+def compute_essential_matrix(K1: Optional[np.ndarray]=None, K2: Optional[np.ndarray]=None,F: Optional[np.ndarray]=None, rel_p:Optional[Union[Pose,Transform]]=None) -> np.ndarray:
     """
     Compute the essential matrix from either the fundamental matrix or relative camera pose.
     

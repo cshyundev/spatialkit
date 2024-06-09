@@ -77,7 +77,7 @@ class Camera:
 # Abstract Class for Radial Camera Model
 class RadialCamera(Camera):
     def __init__(self,cam_dict: Dict[str,Any]):
-        super.__init__(RadialCamera,cam_dict)
+        super(RadialCamera,self).__init__(cam_dict)
         self.fx, self.fy = cam_dict['focal_length']
         self.cx, self.cy = cam_dict['principal_point']
         self.skew = cam_dict['skew']
@@ -115,17 +115,12 @@ class RadialCamera(Camera):
         y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
         return x,y
 
-    def _is_distorted(self):
+    def has_distortion(self):
         raise NotImplementedError
 
     def _distort(self, x: Array, y: Array, extra: bool=False) \
             -> Union[Tuple[Array,Array],Tuple[Array,Array,Array,Array]] :
-        raise NotImplementedError
-        
-    def _compute_residual_jacobian(self,xu:Array,yu:Array, xd:Array, yd:Array) \
-            -> Tuple[Array,Array,Array,Array,Array,Array]:
-        raise NotImplementedError        
-        
+        raise NotImplementedError    
         
     def _undistort(self, xd: Array, yd: Array, err_thr:float, max_iter:int) -> Tuple[Array,Array]:
         raise NotImplementedError        
@@ -150,7 +145,7 @@ class RadialCamera(Camera):
                  ) -> Array:
         if uv is None: uv = self.make_pixel_grid() # (2,HW)
         x,y = self._to_normalized_plane(uv) 
-        if self._is_distorted():
+        if self.has_distortion():
             x,y = self._undistort(x,y,self.err_thr, self.max_iter)
         z = ones_like(x)
         rays = concat([x,y,z], 0) # (3,HW)
@@ -165,7 +160,7 @@ class RadialCamera(Camera):
         Y = rays[1:2,:]
         Z = rays[2:3,:]
         x,y = X / Z, Y / Z
-        if self._is_distorted(): x,y = self._distort(x,y)
+        if self.has_distortion(): x,y = self._distort(x,y)
         u,v = self._to_image_plane(x,y)
         uv = concat([u,v], dim=0)
         return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
@@ -178,7 +173,7 @@ class RadialCamera(Camera):
         vv = concat([v, v+1], dim=1) # (1,2N)
         xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
         yy = (vv - self.cy) / self.fy # (1,2N)
-        if self._is_distorted():
+        if self.has_distortion():
             xx,yy = self._undistort(xx, yy)
         # dx = x[:,:-1] - x[:,1:]
         # dx = concat([dx, dx[:,-2:-1]], dim=1)
@@ -190,7 +185,7 @@ class RadialCamera(Camera):
         return radii.reshape(-1,1) # (HW,1)
 
     def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
-        if self._is_distorted() is False:
+        if self.has_distortion() is False:
             return uv
         
         x,y = self._to_normalized_plane(uv)
@@ -200,7 +195,7 @@ class RadialCamera(Camera):
         return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
 
     def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
-        if self._is_distorted() is False:
+        if self.has_distortion() is False:
             print("Warning: camera Model is just Pinhole without distortion.")
             return uv
 
@@ -213,7 +208,7 @@ class RadialCamera(Camera):
     def undistort_image(self, image:np.ndarray) -> np.ndarray:
         assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
 
-        if self._is_distorted() is False:
+        if self.has_distortion() is False:
             print("Warning: camera Model is just Pinhole without distortion.")
             return image
         if len(image) == 3:
@@ -238,7 +233,7 @@ class RadialCamera(Camera):
     def distort_image(self, image:np.ndarray) -> np.ndarray:
         assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
 
-        if self._is_distorted() is False:
+        if self.has_distortion() is False:
             return image
         if len(image) == 3:
             output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
@@ -355,7 +350,7 @@ class PinholeCamera(RadialCamera):
         }
         return PinholeCamera(cam_dict)
 
-    def _is_distorted(self):
+    def has_distortion(self):
         cnt = np.count_nonzero(self.radial_params) + np.count_nonzero(self.tangential_params)
         return cnt != 0
 
@@ -514,7 +509,7 @@ class EquidistantCamera(RadialCamera):
         }
         return EquidistantCamera(cam_dict)
     
-    def _is_distorted(self):
+    def has_distortion(self):
         return True
     
     def _distort(self, x: Array, y: Array, extra:bool=False) \
@@ -677,7 +672,7 @@ class ThinPrismFisheyeCamera(RadialCamera):
         }
         return ThinPrismFisheyeCamera(cam_dict)
 
-    def _is_distorted(self):
+    def has_distortion(self):
         return True
     
     def _distort(self, x: Array, y: Array) \

@@ -2,8 +2,9 @@ import os.path as osp
 import numpy as np
 from cv_utils.utils.file_utils import read_yaml, read_image
 from cv_utils.core.geometry import Transform, Rotation
+from cv_utils.core.geometry import compute_fundamental_matrix, compute_essential_matrix
 from cv_utils import RotType 
-from cv_utils.core.geometry.camera import PinholeCamera, EquidistantCamera,Camera
+from cv_utils.core.geometry.camera import PinholeCamera, EquidistantCamera,RadialCamera
 from cv_utils.utils.logger import *
 from cv_utils.vis.point_selector import DoubleImagesPointSelector
 from cv_utils.vis.image_utils import *
@@ -125,35 +126,31 @@ def main(unused_args):
     image1 = read_image(image_info[0]["path"])
     image2 = read_image(image_info[1]["path"])
 
-    cam1:Camera = image_info[0]["cam"]
-    cam2:Camera = image_info[1]["cam"]
+    cam1:RadialCamera = image_info[0]["cam"]
+    cam2:RadialCamera = image_info[1]["cam"]
 
     tf1:Transform = image_info[0]["camtoworld"]
     tf2:Transform = image_info[1]["camtoworld"]
-    tf = tf1.inverse() * tf2 # compute relative transform
-    tf = tf.inverse()
+    tf = tf2.inverse() * tf1  # compute relative transform: cam1 to cam2
 
-    # point_selector = DoubleImagesPointSelector(image1, image2, 3)
-    # point_selector.connect()
-    # pts1, pts2 = point_selector.get_points()
+    # undistort image
+    image1 = cam1.undistort_image(image1)
+    image2 = cam2.undistort_image(image2)
 
-    pts1=[(285.85930735930737, 239.35714285714283), (287.04978354978357, 187.92857142857142), (369.3831168831169, 238.64285714285714)]
-    pts2=[(182.85497835497836, 248.1190476190476), (180.75974025974028, 193.59523809523807), (273.42640692640697, 247.73809523809524)]
-
-    zs = np.linspace(1.,15., 100)
+    point_selector = DoubleImagesPointSelector(image1, image2, 3)
+    point_selector.connect()
+    pts1, pts2 = point_selector.get_points()
 
     ## draw dots and epipolar lines
+
     for pt1,pt2 in zip(pts1, pts2):
-        rays = cam1.get_rays(np.array(pt1).reshape(2,-1))
-        back_projected_pt1 = zs*rays
-        transformed_rays = tf.apply_pts3d(back_projected_pt1)
-        reprojected_pt1 = cam2.project_rays(transformed_rays).reshape(-1,2).tolist()
         rgb = tuple(np.random.randint(0,255,3).tolist())
-        pt1 = (int(pt1[0]),int(pt1[1]))
-        pt2 = (int(pt2[0]),int(pt2[1]))
-        image1 = draw_circle(image1,pt1,rgb=rgb)
-        image2 = draw_lines(image2,reprojected_pt1,rgb=rgb)
-        image2 = draw_circle(image2,pt2,rgb=rgb)
+        E = compute_essential_matrix(rel_p=tf)
+        F = compute_fundamental_matrix(K1=cam1.K,K2=cam2.K,E=E)
+        pt_homo = np.array((pt1[0],pt1[1],1.))
+        image1 = draw_circle(image1,pt1,1,rgb,2)
+        image2 = draw_line_by_line(image2,tuple((F@pt_homo).tolist()),rgb,1)
+        image2 = draw_circle(image2,pt2,1,rgb,2)
 
     show_two_images(image1,image2)
 
