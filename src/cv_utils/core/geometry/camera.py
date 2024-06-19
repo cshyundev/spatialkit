@@ -122,21 +122,8 @@ class RadialCamera(Camera):
             -> Union[Tuple[Array,Array],Tuple[Array,Array,Array,Array]] :
         raise NotImplementedError    
         
-    def _undistort(self, xd: Array, yd: Array, err_thr:float, max_iter:int) -> Tuple[Array,Array]:
+    def _undistort(self, xd: Array, yd: Array) -> Tuple[Array,Array]:
         raise NotImplementedError        
-
-    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
-        u = self.fx * x + self.skew * y + self.cx
-        v = self.fy * y + self.cy
-        if use_clip:
-            u = clip(u,0.,float(self.width))
-            v = clip(v,0.,float(self.height))
-        return u,v
-    
-    def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
-        x = (uv[0:1,:] - self.cx - self.skew / self.fy*(uv[1:2,:] -self.cy)) / self.fx # (1,HW)
-        y = (uv[1:2,:] - self.cy) / self.fy #(1,HW)
-        return x,y
 
     def get_rays(self,
                  uv:Array = None, 
@@ -211,7 +198,7 @@ class RadialCamera(Camera):
         if self.has_distortion() is False:
             print("Warning: camera Model is just Pinhole without distortion.")
             return image
-        if len(image) == 3:
+        if image.ndim == 3:
             output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
         else:
             output_image = np.zeros((self.height, self.width), dtype=image.dtype)
@@ -235,7 +222,7 @@ class RadialCamera(Camera):
 
         if self.has_distortion() is False:
             return image
-        if len(image) == 3:
+        if image.ndim == 3:
             output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
         else:
             output_image = np.zeros((self.height, self.width), dtype=image.dtype)
