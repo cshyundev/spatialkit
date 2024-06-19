@@ -21,6 +21,8 @@ build/
 *.json
 *.yaml
 *.png
+*.jpg
+/cal_exmples
 /garage_*
 train_trajectory.txt
 /Replica

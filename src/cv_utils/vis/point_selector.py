@@ -174,6 +174,7 @@ class SingleImagePointSelector:
             x0, y0, _, _ = self.zoom_image_coords
             new_x, new_y = x0 + event.xdata, y0 + event.ydata
             self.points.append((new_x, new_y))
+            self.ax_zoom.plot(event.xdata,event.ydata, 'bo', markersize=10)
             self.ax.plot(new_x, new_y, 'bo', markersize=5)  # Mark the adjusted point
             self.point_count += 1
             if self.point_count < self.num_points:

@@ -1,11 +1,9 @@
-import os.path as osp
-import numpy as np
-from src.camera import *
-from src.plot import show_image, draw_polygon, show_two_images
-from src.file_utils import read_image
-from src.image_transform import *
+from cv_utils.core.geometry.camera import *
+from cv_utils.vis.image_utils import draw_polygon, show_two_images
+from cv_utils.vis.point_selector import SingleImagePointSelector
+from cv_utils.utils.file_utils import read_image
+from cv_utils.core.geometry.image_transform import compute_homography, apply_transform
 from absl import app
-import matplotlib.pyplot as plt
 import argparse
 
 def main(argv):
@@ -22,9 +20,6 @@ def main(argv):
         3. Show the result.
     """   
 
-    ###################################################
-    # Fill the value below!!!
-    
     # Set Parameters
     parser = argparse.ArgumentParser(description='Homography Test')
     parser.add_argument('image_path', type=str, help='Path to the input image')
@@ -39,13 +34,10 @@ def main(argv):
     ###################################################
     image = read_image(image_path)    
 
-    # 2. choose 4 points each 
-    plt.imshow(image)
-    plt.title("Take 4 dots counterclockwise from the top left corner")
-    pts = plt.ginput(4)
-    pts = np.int32(pts)
-    plt.close()
-
+    # 2. choose 4 points each
+    point_selector = SingleImagePointSelector(image,num_points=4)
+    point_selector.connect() 
+    pts = point_selector.get_points()
     output_pts = [(0,0),(0, output_height),(output_width,output_height),(output_width,0)]
 
     H = compute_homography(pts,output_pts)
@@ -60,7 +52,6 @@ def main(argv):
     
     return
 
- 
 
 if __name__ == "__main__":
     app.run(main)
