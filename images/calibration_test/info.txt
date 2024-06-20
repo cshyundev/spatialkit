@@ -1,0 +1,2 @@
+pattern_size 7*5
+square_size(m) 0.02 

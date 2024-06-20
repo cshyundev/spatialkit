@@ -6,41 +6,61 @@ from skimage import img_as_float
 import json
 import yaml
 from PIL import Image
+import os
 
-def read_float(path: str) -> np.ndarray:
-    extension = path.split(sep=".")[-1]
+def read_npy(path: str) -> np.ndarray:
     try:
-        if extension == "npy":
-            data = np.load(path)
-        elif extension == 'tiff':
-            multi_datas = tifffile.TiffFile(path)
-            num_datas = len(multi_datas.pages)
-            if num_datas == 0: raise Exception("No Images.")
-            elif num_datas == 1: data = multi_datas.pages[0].asarray().squeeze()
-            else: data = np.concatenate([np.expand_dim(x.asarray(),0) for x in multi_datas.pages], 0)
-        else:
-            raise Exception("No Support Extension.")
+        data = np.load(path)
     except Exception as e:
-        print("reading data failed.")
+        print(f"Reading npy file {path} failed.")
         print(e)
         data = None
-    return data    
+    return data
 
-def write_float(data:np.ndarray, path:str):
-    extension = path.split(sep=".")[-1]
+def read_tiff(path: str) -> np.ndarray:
     try:
-        if extension == "npy":
-            np.save(path,data)
-        elif extension == "tiff":
-            with tifffile.TiffWriter(path) as tiff:
-                if data.dtype is not np.float32:
-                    data = data.astype(np.float32)
-                tiff.write(data, photometric='MINISBLACK',
-                    bitspersample=32, compression='zlib')
-        else: raise Exception("No Support Extension.")
+        multi_datas = tifffile.TiffFile(path)
+        num_datas = len(multi_datas.pages)
+        if num_datas == 0:
+            raise Exception("No Images.")
+        elif num_datas == 1:
+            data = multi_datas.pages[0].asarray().squeeze()
+        else:
+            data = np.concatenate([np.expand_dims(x.asarray(), 0) for x in multi_datas.pages], 0)
     except Exception as e:
-        print("writing data failed.")
-    
+        print(f"Reading tiff file {path} failed.")
+        print(e)
+        data = None
+    return data
+
+def write_npy(data: np.ndarray, path: str):
+    try:
+        np.save(path, data)
+    except Exception as e:
+        print(f"Writing npy file {path} failed.")
+        print(e)
+
+def write_tiff(data: np.ndarray, path: str):
+    try:
+        with tifffile.TiffWriter(path) as tiff:
+            if data.dtype is not np.float32:
+                data = data.astype(np.float32)
+            tiff.write(data, photometric='MINISBLACK', bitspersample=32, compression='zlib')
+    except Exception as e:
+        print(f"Writing tiff file {path} failed.")
+        print(e)
+
+def read_all_images(image_dir: str, as_float: bool = False) -> Optional[List[np.ndarray]]:
+    image_list = os.listdir(image_dir)
+    images = []
+    for image_name in image_list:
+        image_path = os.path.join(image_dir, image_name)
+        image = read_image(image_path, as_float)
+        if image is None:
+            return None
+        images.append(image)
+    return images 
+
 def read_image(path: str, as_float:bool=False) -> np.ndarray:
     try:
         image = skio.imread(path)
