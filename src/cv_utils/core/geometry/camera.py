@@ -8,29 +8,26 @@ import copy
 import cv2 as cv
 
 class CamType(Enum):
-    PINHOLE = ("PINHOLE", "Pinhole Camera Type")
-    EQUIDISTANT = ("EQUIDISTANT", "Equidistant Camera Type")
+    PRESPECTIVE = ("PRESPECTIVE", "Perspective Camera Type")
+    OPENCV = ("OPENCV", "Open Fisheye Camera Type")
     THINPRISM = ("THINPRISIM", "Thin Prism Fisheye Camera Type")
-    EQUIRECT = ("EQUIRECT", "Equirectangular Camera Type")
     OMNIDIRECT = ("OMNIDIRECT", "Omnidirectional Camera Type")
     DOUBLESPHERE = ("DOUBLESPHERE", "Double Sphere Camera Type")
-    ORTHOGRAPHIC = ("ORTHOGRAPHIC", "Orthographic Camera Type")
+    EQUIRECT = ("EQUIRECT", "Equirectangular Camera Type")
     NONE = ("NONE", "No Camera Type")
     
     @staticmethod
     def from_string(type_str: str)-> 'CamType':
-        if type_str == 'PINHOLE':
-            return CamType.PINHOLE
+        if type_str == 'PRESPECTIVE':
+            return CamType.PRESPECTIVE
         elif type_str == 'OPENCV_FISHEYE':
-            return CamType.EQUIDISTANT
+            return CamType.OPENCV
         elif type_str == 'EQUIRECT':
             return CamType.EQUIRECT
         elif type_str == 'THINPRISIM':
             return CamType.THINPRISM
         elif type_str == "OMNIDIRECT":
             return CamType.OMNIDIRECT
-        elif type_str == 'ORTHOGRAPHIC':
-            return CamType.ORTHOGRAPHIC
         elif type_str == 'DOUBLESPHERE':
             return CamType.DOUBLESPHERE
         else:
@@ -42,16 +39,11 @@ class Camera:
         self.cam_type = CamType.NONE
         self.cam_dict = cam_dict
         self.width,self.height = cam_dict['image_size']
-        self._mask = cam_dict.get("mask",None) # valid mask
-
-        if self._mask is None: self._mask = np.full((self.height, self.width),True, dtype=bool)
-        assert(self._mask.shape == self.hw)
-        
-        self._mask = self._mask.reshape(-1,) # (HW,)
-
+        self._mask = np.full((self.height, self.width),True, dtype=bool).reshape(-1,)
+                
     def make_pixel_grid(self) -> np.ndarray:
         u,v = np.meshgrid(range(self.width), range(self.height))
-        uv = concat([u.reshape((1,-1)), v.reshape((1,-1))], 0)
+        uv = concat([u.reshape((1,-1)), v.reshape((1,-1))], 0).astype(np.float32)
         return uv 
     
     def get_rays(self) -> Dict[str,Array]:
@@ -174,12 +166,9 @@ class RadialCamera(Camera):
         fov_y = 2 * rad2deg(arctan(self.height / (2 * self.fy))) 
         return fov_x, fov_y
 
-    def _to_image_plane(self, x:Array, y:Array, use_clip:bool=False) -> Tuple[Array,Array]:
+    def _to_image_plane(self, x:Array, y:Array) -> Tuple[Array,Array]:
         u = self.fx * x + self.skew * y + self.cx
         v = self.fy * y + self.cy
-        if use_clip:
-            u = clip(u,0.,float(self.width))
-            v = clip(v,0.,float(self.height))
         return u,v
     
     def _to_normalized_plane(self, uv:Array) -> Tuple[Array,Array]:
@@ -229,24 +218,19 @@ class RadialCamera(Camera):
         mask = self._extract_mask(uv)
         return uv, mask
 
-    def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
-        if self.has_distortion() is False:
-            return uv
-        
+    def distort_pixel(self, uv:Array, out_subpixel:bool=False) -> Array:
+        if self.has_distortion() is False: return uv
         x,y = self._to_normalized_plane(uv)
         xd,yd = self._distort(x,y)
-        u,v = self._to_image_plane(xd,yd,use_clip)
+        u,v = self._to_image_plane(xd,yd)
         uv = concat([u,v], dim=0)
         return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
 
-    def undistort_pixel(self, uv:Array, use_clip:bool=False,out_subpixel:bool=False) -> Array:
-        if self.has_distortion() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
-            return uv
-
+    def undistort_pixel(self, uv:Array,out_subpixel:bool=False) -> Array:
+        if self.has_distortion() is False: return uv
         x,y = self._to_normalized_plane(uv)        
         xu,yu = self._undistort(x,y)
-        u,v = self._to_image_plane(xu,yu,use_clip)
+        u,v = self._to_image_plane(xu,yu)
         uv = concat([u,v], dim=0)
         return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
 
@@ -254,7 +238,6 @@ class RadialCamera(Camera):
         assert(self.hw == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
 
         if self.has_distortion() is False:
-            print("Warning: camera Model is just Pinhole without distortion.")
             return image
         
         uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
@@ -270,12 +253,12 @@ class RadialCamera(Camera):
         return output_image
 
 # For Simple Radial Camera Model or small distortion
-class PinholeCamera(RadialCamera):
+class PerpectiveCamera(RadialCamera):
     """
-    Pinhole Camera Model.
+    Perpective Camera Model.
 
     Attributes:
-        cam_type (CamType): Camera type, set to PINHOLE.
+        cam_type (CamType): Camera type, set to PERESPECTIVE.
         fx, fy (float): Focal length in x and y directions.
         cx, cy (float): Principal point coordinates (center of the image).
         skew (float): Skew coefficient between x and y axis.
@@ -284,8 +267,8 @@ class PinholeCamera(RadialCamera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
-        super(PinholeCamera, self).__init__(cam_dict)
-        self.cam_type = CamType.PINHOLE
+        super(PerpectiveCamera, self).__init__(cam_dict)
+        self.cam_type = CamType.PRESPECTIVE
         self.radial_params = cam_dict['radial']
         self.tangential_params = cam_dict['tangential']
         self.err_thr: float = 1e-4
@@ -297,9 +280,9 @@ class PinholeCamera(RadialCamera):
         return np.array(_dist_coeffs)
     
     @staticmethod
-    def from_K(K: List[List[float]], image_size:List[int], dist: List[float] = None) -> 'PinholeCamera':
+    def from_K(K: List[List[float]], image_size:List[int], dist: List[float] = None) -> 'PerpectiveCamera':
         """
-        Static method to create a PinholeCamera instance from intrinsic matrix and distortion coefficients.
+        Static method to create a PerpectiveCamera instance from intrinsic matrix and distortion coefficients.
 
         Args:
             K (List[List[float]]): Intrinsic matrix parameters as a list 3*3 format.
@@ -307,7 +290,7 @@ class PinholeCamera(RadialCamera):
             dist (List[float]): Distortion coefficients as a list [k1, k2, p1, p2, k3].
 
         Returns:
-            PinholeCamera: An instance of PinholeCamera with given parameters.
+            PerpectiveCamera: An instance of PerpectiveCamera with given parameters.
         """
 
         cam_dict = {
@@ -324,19 +307,19 @@ class PinholeCamera(RadialCamera):
             cam_dict["radial"] = [0.,0.,0.]
             cam_dict["tangential"] = [0.,0.]
 
-        return PinholeCamera(cam_dict)
+        return PerpectiveCamera(cam_dict)
     
     @staticmethod
     def from_fov(image_size:List[int], fov:Union[List[float],float]):
         """
-        Static method to create a PinholeCamera instance from image resolution and field of view.
+        Static method to create a PerpectiveCamera instance from image resolution and field of view.
 
         Args:
             image_size (List[int]): Image resolution as a list [width, height].
             fov(Union[List[float],float]): Field of view in degrees as a list [fov_x, fov_y] or width field of view.
 
         Returns:
-            PinholeCamera: An instance of PinholeCamera with calculated parameters.
+            PerpectiveCamera: An instance of PerpectiveCamera with calculated parameters.
         """
         width,height = image_size
         if type(fov) == float:
@@ -363,7 +346,7 @@ class PinholeCamera(RadialCamera):
             'radial': radial_params,
             'tangential': tangential_params
         }
-        return PinholeCamera(cam_dict)
+        return PerpectiveCamera(cam_dict)
 
     def has_distortion(self):
         cnt = np.count_nonzero(self.radial_params) + np.count_nonzero(self.tangential_params)
@@ -470,13 +453,13 @@ class PinholeCamera(RadialCamera):
         return xu,yu
 
 # For OpenCV Fisheye Camera Model
-class EquidistantCamera(RadialCamera):
+class OpenCVCamera(RadialCamera):
     """
-    Represents an Equidistant (Equiangular) Camera Model, typically used for wide-angle or fisheye lenses.
+    Represents an Kannala-Brandt(KB) Camera Model, typically used for wide-angle or fisheye lenses.
     This model is characterized by its equidistant projection, where radial distances are proportional to the actual angles.
 
     Attributes:
-        cam_type (CamType): Camera type, set to EQUIDISTANT, indicating the equidistant projection model.
+        cam_type (CamType): Camera type, set to OpenCV, indicating the OpenCV projection model.
         fx, fy (float): Focal length in x and y directions. These parameters define the scale of the image on the sensor.
         cx, cy (float): Principal point coordinates (center of the image), indicating where the optical axis intersects the image sensor.
         skew (float): Skew coefficient between x and y axis, representing the non-orthogonality between these axes.
@@ -486,8 +469,8 @@ class EquidistantCamera(RadialCamera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
-        super(EquidistantCamera, self).__init__(cam_dict)      
-        self.cam_type = CamType.EQUIDISTANT
+        super(OpenCVCamera, self).__init__(cam_dict)      
+        self.cam_type = CamType.OPENCV
         self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
         self.err_thr: float = 1e-4
         self.max_iter:int=20
@@ -503,7 +486,7 @@ class EquidistantCamera(RadialCamera):
         return np.array(self.radial_params) 
 
     @staticmethod
-    def from_K_D(K: List[float], image_size:List[int], D: List[float]) -> 'EquidistantCamera':
+    def from_K_D(K: List[float], image_size:List[int], D: List[float]) -> 'OpenCVCamera':
         """
         Static method to create an EquidistantCamera (fisheye) instance from intrinsic matrix and distortion coefficients.
 
@@ -754,8 +737,7 @@ class OmnidirectionalCamera(Camera):
         self._max_fov_deg = cam_dict.get("fov_deg", -1.) # maximum fov (degree)
 
         assert(self._max_fov_deg > 0), f"FOV must be positive."
-        
-        if self._max_fov_deg > 0: self._make_fov_mask() # maximum fov mask
+        self._make_fov_mask() # maximum fov mask
 
     def _make_fov_mask(self):
         uv = self.make_pixel_grid()
@@ -766,12 +748,12 @@ class OmnidirectionalCamera(Camera):
         y = inv_det * (-e * u + c * v)
 
         rho = sqrt(x**2 + y**2)
-        theta = polyval(self.poly_coeffs, rho)
-
+        z = polyval(self.poly_coeffs, rho)
+        norm_scale = sqrt(x**2 + y**2 +z**2)
+        theta = arccos(z / norm_scale)
         max_theta = deg2rad(self._max_fov_deg / 2.) 
         # compute max_r
         valid_mask = theta <= max_theta
-
         self._mask = logical_and(valid_mask,self._mask)
 
     def get_rays(self, uv: Array = None, norm: bool = True) -> Array:
@@ -781,8 +763,6 @@ class OmnidirectionalCamera(Camera):
         Args:
             uv (Array): Pixel coordinates.
             norm (bool): Whether to normalize the rays.
-            out_scale (bool): Whether to output depth scale.
-
         Returns:
             Array: Rays in the camera coordinate system.
         """
@@ -792,9 +772,7 @@ class OmnidirectionalCamera(Camera):
         else:
             mask = self._extract_mask(uv)
         
-        valid_uv = uv[:,mask]
-
-        u, v = valid_uv[0:1, :] - self.cx, valid_uv[1:2, :]- self.cy
+        u, v = uv[0:1, :] - self.cx, uv[1:2, :]- self.cy
         c,d,e = self._affine
         inv_det = 1. /(c - d*e)
         x = inv_det * (u - d*v)
@@ -804,7 +782,6 @@ class OmnidirectionalCamera(Camera):
         z = polyval(self.poly_coeffs, rho)
         rays = concat([x,y,z], 0) 
         if norm: rays = normalize(rays, dim=0)
-
         return rays, mask  # (3, N)
     
     def project_rays(self, rays: Array, out_subpixel: bool = False) -> Array:
@@ -818,15 +795,16 @@ class OmnidirectionalCamera(Camera):
         Returns:
             Array: Pixel coordinates in the image plane.
         """
+        rays = normalize(rays,dim=0)
         X = rays[0:1, :]
         Y = rays[1:2, :]
         Z = rays[2:3, :]
-        r = sqrt(X**2 + Y**2)
-        theta = arctan2(Z, r)
 
+        theta = arccos(Z)
         rho = polyval(self.inv_poly_coeffs, theta)
-
-        r_proj = rho / r
+        
+        r = sqrt(X**2 + Y**2)
+        r_proj = rho / (r + EPSILON)
         # sensor coordinates
         x = r_proj * X 
         y = r_proj * Y
@@ -838,7 +816,7 @@ class OmnidirectionalCamera(Camera):
 
         uv = concat([u,v], dim=0)
         mask = self._extract_mask(uv)
-        uv if out_subpixel else as_int(uv,n=32)
+        uv = uv if out_subpixel else as_int(uv,n=32)
         return uv, mask  # (2,N)
         
 # Double Sphere Model

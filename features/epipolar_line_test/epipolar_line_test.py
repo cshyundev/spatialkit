@@ -4,7 +4,7 @@ from cv_utils.utils.file_utils import read_yaml, read_image
 from cv_utils.core.geometry import Transform, Rotation
 from cv_utils.core.geometry import compute_fundamental_matrix, compute_essential_matrix
 from cv_utils import RotType 
-from cv_utils.core.geometry.camera import PinholeCamera, EquidistantCamera,RadialCamera
+from cv_utils.core.geometry.camera import PerpectiveCamera, OpenCVCamera, RadialCamera
 from cv_utils.utils.logger import *
 from cv_utils.vis.point_selector import DoubleImagesPointSelector
 from cv_utils.vis.image_utils import *
@@ -49,9 +49,9 @@ def parse_yaml(file_path):
             LOG_ERROR(f"Missing distortion parameter: {e}")
             return None
         if camera_model == 'pinhole':
-            cam = PinholeCamera.from_K(K,image_size,distortion_params)
+            cam = PerpectiveCamera.from_K(K,image_size,distortion_params)
         elif cam == 'opencv_fisheye':
-            cam = EquidistantCamera.from_K_D(K,image_size,distortion_params)
+            cam = OpenCVCamera.from_K_D(K,image_size,distortion_params)
         # Parse extrinsic parameters
         rotation_type = extrinsic.get('rotation_type')
         try:

@@ -117,7 +117,7 @@ def arcsin(x: Array) -> Array:
     if is_tensor(x): return torch.arcsin(x)
     return np.arcsin(x)
 
-def arcos(x: Array) -> Array:
+def arccos(x: Array) -> Array:
     if is_tensor(x): return torch.arccos(x)
     return np.arccos(x)
 
@@ -132,7 +132,7 @@ def arctan2(x: Array, y: Array) -> Array:
     return np.arctan2(x,y)
 
 # Polynomial functions
-def polyval(coeffs: Array, x: Array) -> Array:
+def polyval(coeffs: Union[Array,List[float]], x: Array) -> Array:
     y = zeros_like(x)
     for c in coeffs:
         y = y * x + c

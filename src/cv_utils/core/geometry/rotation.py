@@ -152,7 +152,7 @@ def rpy_to_SO3(rpy: Array) -> Array:
 def SO3_to_so3(SO3: Array) -> Array:
     assert(is_SO3(SO3)), (f"Invaild Shape. SO3 must be (3,3), but got {str(SO3.shape)}")
     
-    theta = arcos((trace(SO3) - 1.)*0.5)
+    theta = arccos((trace(SO3) - 1.)*0.5)
     vec = 0.5 / sin(theta) * stack([SO3[2,1]-SO3[1,2],SO3[0,2] - SO3[2,0],SO3[1,0] - SO3[0,1]], 0)   
     return theta * vec
 
@@ -342,7 +342,7 @@ def slerp(r1:Rotation,r2:Rotation, t:float):
     if cos_omega > 0.9999: # If the quaternions are very close, use linear interpolation
         q = normalize(q1*(1-t) + q2*t,dim=0)
     else:
-        omega = arcos(cos_omega)
+        omega = arccos(cos_omega)
         sin_omega = sin(omega)
         scale1 = sin((1-t)*omega) / sin_omega
         scale2 = sin(t*omega) / sin_omega

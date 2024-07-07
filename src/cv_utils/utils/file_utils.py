@@ -68,7 +68,7 @@ def read_image(path: str, as_float:bool=False) -> np.ndarray:
              image = img_as_float(image) # normalize [0,255] -> [0.,1.]
         return image 
     except Exception as e:
-        print("reading image failed.")
+        print("Failed to read image")
         return None
 
 def write_image(image:np.ndarray, path: str):

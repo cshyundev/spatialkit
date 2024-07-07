@@ -13,7 +13,7 @@ def main(argv):
 
     To conduct the test, you need:
         1. A directory path saved images.
-        2. Camera Type(Pinhole Camera or Opencv Fisheye Camera)
+        2. Camera Type(Perspective Camera or Opencv Fisheye Camera)
         3. Intrinsic information and distortion parameters 
     
     Test Process
@@ -35,7 +35,7 @@ def main(argv):
     # [0., fy,   cy],
     # [0., 0.,   1.]]
 
-    cam_type = "" # "PINHOLE" or "EQUIDISTANT" (fisheye)
+    cam_type = "" # "PRESPECTIVE" or "OPENCV" (fisheye)
 
     image_size = (0,0) # width and height
     fx,fy = (0.,0.) # fx,fy
@@ -48,19 +48,19 @@ def main(argv):
 
     """
     Distortion parameters 
-    PINHOLE: k1,k2,p1,p2,k3
+    PERSPECTIVE: k1,k2,p1,p2,k3
     FISHEYE: k1,k2,k3,k4
     """
     dist = []
     ###################################################
 
 
-    if cam_type == "PINHOLE":
-        assert(len(dist) == 5), "Number of distortion parameters must be 5 for pinhole"
-        cam = PinholeCamera.from_K(K,image_size,dist)
+    if cam_type == "PERSPECTIVE":
+        assert(len(dist) == 5), "Number of distortion parameters must be 5 for perspective camera"
+        cam = PerpectiveCamera.from_K(K,image_size,dist)
     elif cam_type == "FISHEYE":
-        assert(len(dist) == 4), "Number of distortion parameters must be 4 for fisheye"
-        cam = EquidistantCamera.from_K_D(K,image_size,dist)
+        assert(len(dist) == 4), "Number of distortion parameters must be 4 for fisheye camera"
+        cam = OpenCVCamera.from_K_D(K,image_size,dist)
     else:
         print("Unkown Camera Type.")
         return 

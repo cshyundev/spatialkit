@@ -206,13 +206,13 @@ def recover_pose(E: np.ndarray) -> Pose:
 
     return Pose(t, Rotation.from_mat3(R1))
 
-def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Union[PinholeCamera,EquidistantCamera,ThinPrismFisheyeCamera], cv_flags:Any=None) -> Transform:
+def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:RadialCamera, cv_flags:Any=None) -> Transform:
     """
        Computes the camera pose using the Perspective-n-Point (PnP) problem solution.
        Parameters:
             pts2d (np.ndarray): 2D image points (N x 2).
             pts3d (np.ndarray): Corresponding 3D scene points (N x 3).
-            cam: Camera instance, which can be one of Pinhole, Equidistant, or ThinPrismFisheye models.
+            cam: Camera instance, which can be one of Radial models.
             cv_flags (Any, optional): Additional options for solving PnP.
 
         Returns:
@@ -222,7 +222,7 @@ def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Union[PinholeCamera,Equi
             AssertionError: If the camera type is not supported.
     """
     cam_type = cam.cam_type
-    available_cam_types = [ CamType.PINHOLE, CamType.EQUIDISTANT, CamType.THINPRISM]
+    available_cam_types = [ CamType.PRESPECTIVE , CamType.OPENCV, CamType.THINPRISM]
     assert(cam_type in available_cam_types), f"Unavailable Camera Type: {cam_type.name}"
 
     pts2d_undist =  cam.undistort_pixel(pts2d) # 2 * N
