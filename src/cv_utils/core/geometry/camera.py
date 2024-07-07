@@ -1,18 +1,19 @@
 import numpy as np
-
 from ...constant import PI
 from ..operations.hybrid_operations import *
 from ..operations.hybrid_math import *
 from enum import Enum
 from typing import *
-from scipy.ndimage import map_coordinates
 import copy
+import cv2 as cv
 
 class CamType(Enum):
     PINHOLE = ("PINHOLE", "Pinhole Camera Type")
     EQUIDISTANT = ("EQUIDISTANT", "Equidistant Camera Type")
     THINPRISM = ("THINPRISIM", "Thin Prism Fisheye Camera Type")
     EQUIRECT = ("EQUIRECT", "Equirectangular Camera Type")
+    OMNIDIRECT = ("OMNIDIRECT", "Omnidirectional Camera Type")
+    DOUBLESPHERE = ("DOUBLESPHERE", "Double Sphere Camera Type")
     ORTHOGRAPHIC = ("ORTHOGRAPHIC", "Orthographic Camera Type")
     NONE = ("NONE", "No Camera Type")
     
@@ -26,8 +27,12 @@ class CamType(Enum):
             return CamType.EQUIRECT
         elif type_str == 'THINPRISIM':
             return CamType.THINPRISM
+        elif type_str == "OMNIDIRECT":
+            return CamType.OMNIDIRECT
         elif type_str == 'ORTHOGRAPHIC':
             return CamType.ORTHOGRAPHIC
+        elif type_str == 'DOUBLESPHERE':
+            return CamType.DOUBLESPHERE
         else:
             return CamType.NONE
 
@@ -37,42 +42,109 @@ class Camera:
         self.cam_type = CamType.NONE
         self.cam_dict = cam_dict
         self.width,self.height = cam_dict['image_size']
-    
+        self._mask = cam_dict.get("mask",None) # valid mask
+
+        if self._mask is None: self._mask = np.full((self.height, self.width),True, dtype=bool)
+        assert(self._mask.shape == self.hw)
+        
+        self._mask = self._mask.reshape(-1,) # (HW,)
+
     def make_pixel_grid(self) -> np.ndarray:
         u,v = np.meshgrid(range(self.width), range(self.height))
         uv = concat([u.reshape((1,-1)), v.reshape((1,-1))], 0)
         return uv 
     
-    def get_rays(self) -> Array:
+    def get_rays(self) -> Dict[str,Array]:
         raise NotImplementedError
     
-    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
-        raise NotImplementedError
-    
-    def get_radii(self) -> Array:
+    def project_rays(self, rays: Array, out_subpixel:bool=False) -> Dict[str,Array]:
         raise NotImplementedError
     
     @property
-    def resolution(self):
-        return (self.width,self.height)
+    def hw(self):
+        return (self.height,self.width)
     
+    @property
+    def mask(self):
+        return self._mask.reshape(self.height,self.width)
+
     def export_cam_dict(self):
         cam_dict = copy.deepcopy(self.cam_dict) 
         cam_dict["cam_type"] = self.cam_type.name
         return cam_dict
+    
+    def _warp(self, image:Array, uv:Array, valid_mask:Optional[Array]=None):
+        """
+        Warp the given image according to the provided uv coordinates.
+
+        Args:
+            image (Array, [H,W] or [H,W,3]): Input image to be warped. Can be grayscale or color.
+            uv (Array, [2,N]): 2D input coordinates for warping. N should be equal to self.height * self.width.
+            valid_mask (np.ndarray, [2,N], optional): Valid mask to specify which coordinates are valid. Default is None.
+
+        Returns:
+            np.ndarray, [self.height,self.width]: Warped output image.
+
+        Example:
+            - This function uses the cv2.remap function to warp the input image.
+            - The uv coordinates are expected to be in the format [2, N], where N = self.height * self.width.
+            - If the input image is grayscale, it is converted to a 3D array with a single channel for consistent processing.
+            - Each channel of the image is warped separately, and the results are combined to form the output image.
+            - If a valid_mask is provided, only valid coordinates will be considered during warping.
+        """
+        uv = convert_numpy(uv) # check uv type
+        u = uv[0, :].reshape(self.hw).astype(np.float32)
+        v = uv[1, :].reshape(self.hw).astype(np.float32)
+        output_image = cv.remap(image,u,v, cv.INTER_LINEAR)
+        valid_mask = convert_numpy(valid_mask).reshape(self.hw)
+        output_image[~valid_mask] = 0.0 
+        return output_image
+
+    def warp(self, image:Array, uv:Array, valid_mask:Array=None):
+        return self._warp(image,uv,valid_mask)
+
+    def _extract_mask(self, uv: Array) -> Array:
+        """
+        Extract a mask indicating valid uv points within the image bounds and mask.
+
+        Args:
+            uv (Array, (2, N)): Array of shape (2, N) containing uv points where
+                                     uv[0, :] are x coordinates and uv[1, :] are y coordinates.
+
+        Returns:
+            Array (Array, (N,)): Boolean array of shape (N,) indicating whether each uv point
+                                           is valid (True) or not (False).
+
+        Details:
+            - A uv point is considered valid if it is within the image bounds
+              (0 <= x < self.width and 0 <= y < self.height).
+            - Additionally, the corresponding point in the predefined mask
+              (self._mask) must be True for the uv point to be considered valid.
+            - The function handles uv points with both integer and float values.
+            - The mask (self._mask) is expected to be a flattened array of size (H * W,).
+        Example:
+            uv = np.array([[1, 3, 5, 11, 0],  # x coordinates
+                           [1, 3, 5, 5, -1]]) # y coordinates
+            valid_mask = self._extract_mask(uv)
+        """
+        num_points = uv.shape[1]
+        valid_mask = full_like(uv[0], False,bool)  # (N,)
         
-    @staticmethod
-    def create_cam(cam_dict: Dict[str, Any]) -> 'Camera':
-        cam_type = CamType.from_string(cam_dict['cam_type']) 
-        
-        if cam_type is CamType.PINHOLE:
-            return PinholeCamera(cam_dict)
-        elif cam_type is CamType.EQUIDISTANT:
-            raise NotImplementedError
-        elif cam_type is CamType.EQUIRECT:
-            return EquirectangularCamera(cam_dict)
-        else:
-            raise Exception("Unkwon Camera Type")
+        within_image_bounds = logical_and(uv[0,:] < self.width,
+                                  uv[1,:] < self.height,
+                                  uv[0,:] >= 0,
+                                  uv[1,:] >= 0) # (N,)
+
+        is_in_image_indices = arange(uv,0,num_points)[within_image_bounds]
+
+        valid_uv = uv[:,within_image_bounds]
+        if valid_uv.size == 0: return valid_mask
+        mask_indices = as_int(valid_uv[1]) * self.width + as_int(valid_uv[0]) # (N,)
+
+        mask = convert_array(self._mask,uv)
+        valid_mask[is_in_image_indices] = mask[mask_indices]
+
+        return valid_mask
 
 # Abstract Class for Radial Camera Model
 class RadialCamera(Camera):
@@ -80,7 +152,7 @@ class RadialCamera(Camera):
         super(RadialCamera,self).__init__(cam_dict)
         self.fx, self.fy = cam_dict['focal_length']
         self.cx, self.cy = cam_dict['principal_point']
-        self.skew = cam_dict['skew']
+        self.skew = cam_dict.get('skew', 0.)
     
     @property
     def K(self):
@@ -127,20 +199,22 @@ class RadialCamera(Camera):
 
     def get_rays(self,
                  uv:Array = None, 
-                 norm:bool = True,
-                 out_scale:bool = False
+                 norm:bool = True
                  ) -> Array:
-        if uv is None: uv = self.make_pixel_grid() # (2,HW)
+        if uv is None:
+            uv = self.make_pixel_grid() # (2,HW)
+            mask = self._mask
+        else:
+            mask = self._extract_mask(uv)
+
         x,y = self._to_normalized_plane(uv) 
         if self.has_distortion():
-            x,y = self._undistort(x,y,self.err_thr, self.max_iter)
+            x,y = self._undistort(x,y)
         z = ones_like(x)
         rays = concat([x,y,z], 0) # (3,HW)
         if norm: rays = normalize(rays,dim=0)
-        if out_scale:
-            depth_scale = rays[2:3,:]
-            return rays, depth_scale
-        return rays # (3,HW)
+
+        return rays, mask
     
     def project_rays(self, rays: Array, out_subpixel:bool=False) -> Array:
         X = rays[0:1,:]
@@ -150,26 +224,10 @@ class RadialCamera(Camera):
         if self.has_distortion(): x,y = self._distort(x,y)
         u,v = self._to_image_plane(x,y)
         uv = concat([u,v], dim=0)
-        return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
 
-    def get_radii(self, uv:Array=None):
-        if uv is None: uv = self.make_pixel_grid()
-        u,v = uv[0:1,:],uv[1:2,:] # (1,N)
-        num_pixels = u.shape[1]
-        uu = concat([u, u+1], dim=1) # (1,2N)
-        vv = concat([v, v+1], dim=1) # (1,2N)
-        xx = (uu - self.cx - self.skew / self.fy*(vv -self.cy)) / self.fx # (1,2N)
-        yy = (vv - self.cy) / self.fy # (1,2N)
-        if self.has_distortion():
-            xx,yy = self._undistort(xx, yy)
-        # dx = x[:,:-1] - x[:,1:]
-        # dx = concat([dx, dx[:,-2:-1]], dim=1)
-        # dy = y[:,-1:] - y[:,1:]
-        # dy = concat([dy, dy[:,-2:-1]],dim=1)
-        dx = xx[:,num_pixels:] - xx[:,:num_pixels] 
-        dy = yy[:,num_pixels:] - yy[:,:num_pixels] 
-        radii = sqrt(dx**2 + dy**2) * 2 / np.sqrt(12) # (1,HW)
-        return radii.reshape(-1,1) # (HW,1)
+        uv = uv if out_subpixel else as_int(uv,n=32) # (2,N)
+        mask = self._extract_mask(uv)
+        return uv, mask
 
     def distort_pixel(self, uv:Array, use_clip:bool=False, out_subpixel:bool=False) -> Array:
         if self.has_distortion() is False:
@@ -193,52 +251,22 @@ class RadialCamera(Camera):
         return uv if out_subpixel else as_int(uv,n=32) # (2,HW)
 
     def undistort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
+        assert(self.hw == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
 
         if self.has_distortion() is False:
             print("Warning: camera Model is just Pinhole without distortion.")
             return image
-        if image.ndim == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
         
         uv = self.distort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
+        output_image = self._warp(image,uv)
         return output_image
 
     def distort_image(self, image:np.ndarray) -> np.ndarray:
-        assert((self.height,self.width) == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
-
-        if self.has_distortion() is False:
-            return image
-        if image.ndim == 3:
-            output_image = np.zeros((self.height, self.width, image.shape[2]), dtype=image.dtype)
-        else:
-            output_image = np.zeros((self.height, self.width), dtype=image.dtype)
+        assert(self.hw == (image.shape[0:2])), "Image's resolution must be same as camera's resolution."
+        if self.has_distortion() is False: return image
         
         uv = self.undistort_pixel(self.make_pixel_grid(),out_subpixel=True)
-        # Split coordinates
-        input_x, input_y = uv[0, :], uv[1, :]
-    
-        if image.ndim == 3:
-            # For multi-channel images, handle each channel separately
-            for c in range(image.shape[2]):
-                output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        else:
-            # For single-channel images
-            output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((self.height, self.width))
-        
+        output_image = self._warp(image,uv)        
         return output_image
 
 # For Simple Radial Camera Model or small distortion
@@ -597,16 +625,7 @@ class ThinPrismFisheyeCamera(RadialCamera):
             self.poly_coeffs = cam_dict["poly_coeffs"]
         else:
             self.poly_coeffs = self._compute_polynomial_coeffs()
-    
-    @property
-    def K(self) -> np.ndarray:
-        K = np.eye(3)
-        K[0,0] = self.fx
-        K[1,1] = self.fy
-        K[0,2] = self.cx
-        K[1,2] = self.cy
-        return K
-    
+        
     @property
     def dist_coeffs(self):
         _dist_coeffs = self.radial_params[0:2] + self.tangential_params + self.radial_params[2:] + self.prism_params
@@ -705,7 +724,237 @@ class ThinPrismFisheyeCamera(RadialCamera):
         yu = polyval(self.poly_coeffs[1], yd)
        
         return xu,yu
+
+# For Scaramuzza Fisheye Model (Wide FOV Fisheye Model) 
+class OmnidirectionalCamera(Camera):
+    """
+    OmnidirectionalCamera Camera Model.
+
+    Attributes:
+        cam_type (CamType): Camera type, set to OMNIDIRECT (OmnidirectionalCamera).
+        cx (float): The x-coordinate of the central point of the omnidirectional image.
+        cy (float): The y-coordinate of the central point of the omnidirectional image.
+        affine (List[float]): Affine Transform elements.
+        poly_vals (List[float]): Polynomial coefficients for forward projection.
+        inv_poly_vals (List[float]): Polynomial coefficients for inverse projection.
+    """
+    def __init__(self, cam_dict: Dict[str, Any]):
+        """
+        Initializes the OmnidirectionalCamera with camera parameters.
+
+        Args:
+            cam_dict (Dict[str, Any]): A dictionary containing camera parameters.
+        """
+        super(OmnidirectionalCamera, self).__init__(cam_dict)
+        self.cam_type = CamType.OMNIDIRECT
+        self.cx, self.cy = cam_dict["distortion_center"]
+        self.poly_coeffs = np.array(cam_dict["poly_coeffs"]) 
+        self.inv_poly_coeffs = np.array(cam_dict["inv_poly_coeffs"]) 
+        self._affine = cam_dict.get("affine", [1., 0., 0.])  # c,d,e
+        self._max_fov_deg = cam_dict.get("fov_deg", -1.) # maximum fov (degree)
+
+        assert(self._max_fov_deg > 0), f"FOV must be positive."
+        
+        if self._max_fov_deg > 0: self._make_fov_mask() # maximum fov mask
+
+    def _make_fov_mask(self):
+        uv = self.make_pixel_grid()
+        u, v = uv[0, :] - self.cx, uv[1, :] -self.cy
+        c,d,e = self._affine
+        inv_det = 1. /(c - d*e)
+        x = inv_det * (u - d*v)
+        y = inv_det * (-e * u + c * v)
+
+        rho = sqrt(x**2 + y**2)
+        theta = polyval(self.poly_coeffs, rho)
+
+        max_theta = deg2rad(self._max_fov_deg / 2.) 
+        # compute max_r
+        valid_mask = theta <= max_theta
+
+        self._mask = logical_and(valid_mask,self._mask)
+
+    def get_rays(self, uv: Array = None, norm: bool = True) -> Array:
+        """
+        Get the rays for the given pixel coordinates.
+
+        Args:
+            uv (Array): Pixel coordinates.
+            norm (bool): Whether to normalize the rays.
+            out_scale (bool): Whether to output depth scale.
+
+        Returns:
+            Array: Rays in the camera coordinate system.
+        """
+        if uv is None:
+            uv = self.make_pixel_grid()  # (2, HW)
+            mask = self._mask
+        else:
+            mask = self._extract_mask(uv)
+        
+        valid_uv = uv[:,mask]
+
+        u, v = valid_uv[0:1, :] - self.cx, valid_uv[1:2, :]- self.cy
+        c,d,e = self._affine
+        inv_det = 1. /(c - d*e)
+        x = inv_det * (u - d*v)
+        y = inv_det * (-e * u + c * v)
+
+        rho = sqrt(x**2 + y**2)
+        z = polyval(self.poly_coeffs, rho)
+        rays = concat([x,y,z], 0) 
+        if norm: rays = normalize(rays, dim=0)
+
+        return rays, mask  # (3, N)
     
+    def project_rays(self, rays: Array, out_subpixel: bool = False) -> Array:
+        """
+        Project the 3D rays back to the 2D image plane.
+
+        Args:
+            rays (Array): 3D rays in the camera coordinate system.
+            out_subpixel (bool): Whether to output subpixel coordinates.
+
+        Returns:
+            Array: Pixel coordinates in the image plane.
+        """
+        X = rays[0:1, :]
+        Y = rays[1:2, :]
+        Z = rays[2:3, :]
+        r = sqrt(X**2 + Y**2)
+        theta = arctan2(Z, r)
+
+        rho = polyval(self.inv_poly_coeffs, theta)
+
+        r_proj = rho / r
+        # sensor coordinates
+        x = r_proj * X 
+        y = r_proj * Y
+
+        c,d,e = self._affine
+        # image coordinates
+        u = c * x + d * y + self.cx
+        v = e * x + y + self.cy
+
+        uv = concat([u,v], dim=0)
+        mask = self._extract_mask(uv)
+        uv if out_subpixel else as_int(uv,n=32)
+        return uv, mask  # (2,N)
+        
+# Double Sphere Model
+class DoubleSphereCamera(Camera):
+    """
+    Double Sphere Camera Model.
+    Adapted by https://github.com/matsuren/dscamera
+
+
+    Attributes:
+        cam_type (CamType): Camera type, set to DOUBLESPHERE (Double Sphere Camera).
+        cx (float): The x-coordinate of the central point of the image.
+        cy (float): The y-coordinate of the central point of the image.
+        fx (float): The focal length in x direction.
+        fy (float): The focal length in y direction.
+        xi (float): The first parameter of the double sphere model.
+        alpha (float): The second parameter of the double sphere model.
+    """
+    def __init__(self, cam_dict: Dict[str, Any]):
+        """
+        Initializes the DoubleSphereCamera with camera parameters.
+
+        Args:
+            cam_dict (Dict[str, Any]): A dictionary containing camera parameters.
+        """
+        super(DoubleSphereCamera, self).__init__(cam_dict)
+        self.cam_type = CamType.DOUBLESPHERE
+        self.cx, self.cy = cam_dict["principal_point"]
+        self.fx, self.fy = cam_dict["focal_length"]
+        self.xi = cam_dict["xi"]
+        self.alpha = cam_dict["alpha"]
+        self._max_fov_deg = cam_dict.get("fov_deg", -1.) # maximum fov (degree)
+        self._mask = cam_dict.get("mask", None) # valid mask
+        
+        if self._mask is None: self._mask = np.full((self.height * self.width,),True, dtype=bool)
+        
+        assert(self._max_fov_deg > 0), f"FOV must be positive."
+
+        self.fov_cos = cos(deg2rad(self._max_fov_deg / 2.)) 
+
+    def _compute_fov_mask(self, z:Array) -> Array:
+        # z must be an element of unit vector. i.e. |(x,y,z)| = 1.
+        return z >= convert_array(self.fov_cos,z)
+
+    def get_rays(self, uv: Array = None) -> Array:
+        if uv is None:
+            uv = self.make_pixel_grid()  # (2, HW)
+            mask = self._mask
+        else:
+            mask = self._extract_mask(uv)
+
+        mx = (uv[0:1,:] - self.cx) / self.fx 
+        my = (uv[1:2,:] - self.cy) / self.fy
+        r2 = mx**2 + my**2
+        
+        s = 1. - (2*self.alpha - 1.) *r2
+        valid_mask = s >= 0.
+        s[logical_not(valid_mask)] = 0.
+        mz = (1- self.alpha * self.alpha * r2) \
+        / (self.alpha * sqrt(s) + 1. - self.alpha)
+
+        k = (mz*self.xi + sqrt(mz**2 + (1. - self.xi * self.xi)* r2)) / (mz**2 + r2)
+        X = k * mx
+        Y = k * my
+        Z = k * mz - self.xi
+        rays = concat([X,Y,Z], 0)
+
+        # Compute FOV Mask
+        fov_mask = self._compute_fov_mask(Z)
+        mask = logical_and(mask, fov_mask, valid_mask)
+
+        return rays, mask  # (3, N)
+
+    def project_rays(self, rays: Array, out_subpixel:bool = False) -> Array:
+        """
+        Project the 3D rays back to the 2D image plane.
+
+        Args:
+            rays (Array): 3D rays in the camera coordinate system.
+            out_subpixel (bool): Whether to output subpixel coordinates.
+
+        Returns:
+            Array: Pixel coordinates in the image plane.
+        """
+        rays = normalize(rays,dim=0)
+        x = rays[0:1, :]
+        y = rays[1:2, :]
+        z = rays[2:3, :]
+
+        x2, y2, z2 = x**2, y**2, z**2
+        d1 = sqrt(x2 + y2 + z2)
+
+        xidz = self.xi * d1 + z
+        d2 = sqrt(x2 + y2 + xidz**2)
+        
+        denom = self.alpha * d2 + (1. - self.alpha) * xidz
+        u = self.fx * x / denom + self.cx
+        v = self.fy * y / denom + self.cy
+        uv = concat([u,v], dim=0)
+
+        # compute valid area
+        if self.alpha <= 0.5:
+            w1 = self.alpha / (1. - self.alpha)
+        else:
+            w1 = (1. - self.alpha) / self.alpha
+        w2 = w1 + self.xi / sqrt(2*w1*self.xi + self.xi **2 + 1.)
+        valid_mask = z > -w2 * d1
+
+        fov_mask = self._compute_fov_mask(z)
+        mask = self._extract_mask(uv)
+        mask = logical_and(fov_mask.reshape(-1,), valid_mask.reshape(-1,), mask)
+        uv = uv if out_subpixel else as_int(uv,n=32)
+
+        return uv, mask  # (2,HW)
+
+# For Equirectangular Camera Model
 class EquirectangularCamera(Camera):
     """
     Equirectangular Camera Model.
@@ -732,31 +981,32 @@ class EquirectangularCamera(Camera):
         super(EquirectangularCamera, self).__init__(cam_dict)
         self.cam_type = CamType.EQUIRECT
         
-        self.min_phi_deg:float = cam_dict["min_phi_deg"]
-        self.max_phi_deg:float = cam_dict["max_phi_deg"]
-        self.cx = self.width / 2.0
-        self.cy = (self.height - 1.) / 2.0
+        self.min_phi_deg:float = cam_dict.get("min_phi_deg",-90.)
+        self.max_phi_deg:float = cam_dict.get("max_phi_deg",90.)
+        self.cx:float = (self.width-1) / 2.0
+        self.cy:float = (self.height-1) / 2.0
 
-        self.phi_scale = deg2rad((self.max_phi_deg - self.min_phi_deg)*0.5)
+        self.phi_scale = deg2rad(self.max_phi_deg - self.min_phi_deg)
         self.phi_offset = deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
 
-    def get_rays(self, uv:np.ndarray = None, out_scale:bool=False):
-        if uv is None: uv = self.make_pixel_grid()
-        theta = (uv[0:1,:]-self.cx) / self.cx * PI
-        phi = (uv[1:2,:] - self.cy) / self.cy * self.phi_scale + self.phi_offset
+    def get_rays(self, uv:np.ndarray = None):
+        if uv is None:
+            uv = self.make_pixel_grid()
+            mask = convert_array(self._mask,uv) 
+        else: 
+            mask = self._extract_mask(uv)
+        
+        theta = (uv[0:1,:]-self.cx) / self.width * PI * 2.
+        phi = (uv[1:2,:] - self.cy) / self.height * self.phi_scale + self.phi_offset 
         x = sin(theta) * cos(phi)
         y = sin(phi)
         z = cos(theta) * cos(phi)
-        ray = concat([x,y,z],0)
-        invalid_ray = logical_or(phi < self.min_phi_deg, phi > self.max_phi_deg).reshape(-1,)
-        ray[:,invalid_ray] = np.nan if is_numpy(ray) else torch.nan
-        if out_scale:
-            depth_scale = ones_like(z)
-            depth_scale[:,invalid_ray] = np.nan if is_numpy(ray) else torch.nan
-            return ray, depth_scale
-        return ray # (3,HW)
+        rays = concat([x,y,z],0) # (3,N)
+        valid_ray = logical_and(phi >= self.min_phi_deg, phi <= self.max_phi_deg).reshape(-1,)
+        mask = logical_and(valid_ray, mask)
+        return rays, mask 
     
-    def project_rays(self, rays:Array) -> Array:
+    def project_rays(self, rays:Array, out_subpixel:bool = False) -> Array:
         """
         Projects a 3D ray back to the equirectangular image plane.
 
@@ -766,41 +1016,18 @@ class EquirectangularCamera(Camera):
             Array Type: The x and y coordinates on the equirectangular image for each ray.
         """
         # Normalize the ray vector
-        norm = normalize(rays, dim=0)
-        rays = rays / norm
+        rays = normalize(rays, dim=0)
+        X = rays[0:1,:]
+        Y = rays[1:2,:]
+        Z = rays[2:3,:]
 
         # Convert Cartesian coordinates to spherical coordinates
-        phi = arctan2(rays[1], sqrt(rays[0]**2 + rays[2]**2))
-        theta = arctan2(rays[0], rays[2])
+        theta = arctan2(X,Z)
+        phi = arcsin(Y)
         # Convert spherical coordinates to pixel coordinates
-        x = (rad2deg(theta) + 180.0) * self.cx / PI
-        y = ((rad2deg(phi) - rad2deg(self.phi_offset)) / rad2deg(self.phi_scale)) + self.cy
-        return as_int(concat([x, y], dim=0),n=32) 
-
-    def get_radii(self, uv:Array=None) -> Array:
-        if uv is None: uv = self.make_pixel_grid()
-        dt_theta = PI / self.width
-        phi = (uv[1:2,:] -self.cy) / self.cy * self.phi_scale - self.phi_offset
-        radii = 2 * sin(dt_theta) * cos(phi)
-        return radii.reshape(-1,1) * 2 / sqrt(12)
-
-# Not Complete
-class OrthographicCamera(Camera):
-    def __init__(self, cam_dict: Dict[str, Any]):
-        super(self,OrthographicCamera).__init__(cam_dict)
-        self.cam_type = CamType.ORTHOGRAPHIC
-
-    def get_rays(self, uv:Array=None) -> Array:
-        if uv is None: uv = self.make_pixel_grid()
-        # 모든 광선이 동일한 방향을 가지고 카메라 평면에 수직
-        direction = np.array([0, 0, 1])  # z축 방향을 예로 듭니다.
-        rays = np.tile(direction, (self.width * self.height, 1))
-        return rays
-    
-    def project_rays(self, rays: np.ndarray, out_subpixel:bool=False) -> np.ndarray:
-        # 직교 투영에서는 방향 변화 없이 그대로 광선을 반환
-        return rays
-    
-    def get_radii(self) -> np.ndarray:
-        # 직교 투영의 경우 빛의 집중이나 확산이 없으므로 1로 고정
-        return np.ones((self.width * self.height,))
+        u = theta / PI * self.width  + self.cx
+        v = (phi - self.phi_offset) * self.height / self.phi_scale + self.cy
+        uv = concat([u,v],dim=0)
+        mask = self._extract_mask(uv)
+        uv = uv if out_subpixel else as_int(uv,n=32)
+        return uv, mask

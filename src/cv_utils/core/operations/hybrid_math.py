@@ -125,9 +125,11 @@ def arctan(x: Array) -> Array:
     if is_tensor(x): return torch.arctan(x)
     return np.arctan(x)
 
-def arctan2(x: Array) -> Array:
-    if is_tensor(x): return torch.arctan2(x)
-    return np.arctan2(x)
+def arctan2(x: Array, y: Array) -> Array:
+    if is_tensor(x):
+        y = convert_tensor(y,x)
+        return torch.arctan2(x, y)
+    return np.arctan2(x,y)
 
 # Polynomial functions
 def polyval(coeffs: Array, x: Array) -> Array:

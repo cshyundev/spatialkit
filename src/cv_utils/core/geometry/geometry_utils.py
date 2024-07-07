@@ -6,6 +6,7 @@ from .tf import Transform
 from .camera import *
 from typing import *
 import cv2 as cv
+from scipy.ndimage import map_coordinates
 
 def compute_essential_matrix(K1: Optional[np.ndarray]=None, K2: Optional[np.ndarray]=None,F: Optional[np.ndarray]=None, rel_p:Optional[Union[Pose,Transform]]=None) -> np.ndarray:
     """
@@ -231,7 +232,7 @@ def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Union[PinholeCamera,Equi
     tr = Transform.from_rot_vec_t(rvec,tvec)
     return tr
 
-def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: Transform) -> np.ndarray:
+def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: Transform = None) -> np.ndarray:
     """
     Transition the view from one camera to another with a specified transformation.
 
@@ -245,32 +246,33 @@ def transition_camera_view(image: np.ndarray, src_cam: Camera, dst_cam: Camera, 
     np.ndarray: The output image transformed and projected onto the destination camera's resolution.
     """
     
-    out_width, out_height = dst_cam.resolution
+    out_height,out_width  = dst_cam.hw
     # Prepare the output image array
-    if image.ndim == 3:
-        output_image = np.zeros((out_height, out_width, image.shape[2]), dtype=image.dtype)
+    if src_image.ndim == 3:
+        output_image = np.zeros((out_height, out_width, src_image.shape[2]), dtype=src_image.dtype)
     else:
-        output_image = np.zeros((out_height, out_width), dtype=image.dtype)
+        output_image = np.zeros((out_height, out_width), dtype=src_image.dtype)
 
-    output_rays = dst_cam.get_rays()  # 3 * N
-
+    output_rays, dst_valid_mask = dst_cam.get_rays()  # 3 * N
     # Apply inverse transform
-    inverse_transform = transform.inverse()
-    transformed_rays = inverse_transform.apply_pts3d(output_rays)  # 3 * N
+    if transform:
+        inverse_transform = transform.inverse()
+        output_rays = inverse_transform.apply_pts3d(output_rays)  # 3 * N
 
     # Project ray onto source camera
-    input_coords = src_cam.project_rays(transformed_rays, out_subpixel=True)  # 2 * N
-    
+    input_coords, src_valid_mask  = src_cam.project_rays(output_rays, out_subpixel=True)  # 2 * N
+    # input_coords = input_coords[:,src_valid_mask]
     # Split coordinates
     input_x, input_y = input_coords[0, :], input_coords[1, :]
-    
-    if image.ndim == 3:
+    if src_image.ndim == 3:
         # For multi-channel images, handle each channel separately
-        for c in range(image.shape[2]):
-            output_image[..., c] = map_coordinates(image[..., c], [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+        for c in range(src_image.shape[2]):
+            output_image[..., c] = map_coordinates(src_image[..., c], [input_y, input_x], order=1, mode='constant').reshape((out_height, out_width))
     else:
         # For single-channel images
-        output_image = map_coordinates(image, [input_y, input_x], order=1, mode='reflect').reshape((out_height, out_width))
+        output_image = map_coordinates(src_image, [input_y, input_x], order=1, mode='constant').reshape((out_height, out_width))
+    mask = logical_and(src_valid_mask,dst_valid_mask).reshape((out_height,out_width))
+    output_image[~mask] = 0.    
 
     return output_image
 

@@ -139,7 +139,8 @@ class Transform:
         R_inv = self.rot.inverse()
         t_inv = -R_inv.apply_pts3d(self.t.T)
         return Transform(t_inv.T, R_inv)
-
+    
+    @DeprecationWarning
     def get_origin_direction(self, rays: Array):
         """
         Get the origin and direction vectors from rays (local coordinates).

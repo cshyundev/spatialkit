@@ -34,6 +34,11 @@ def convert_array(x:Any, array:Array) -> Array:
     if is_tensor(array): return convert_tensor(x,array)
     return convert_numpy(x)
 
+def numel(x:Array) -> Array:
+    assert is_array(x), "Invalid type. Input type must be either ndarray or Tensor."
+    if is_tensor(x): return x.numel()
+    return x.size
+
 def _assert_same_array_type(arrays: Tuple[Array, ...]):
     assert all(is_tensor(arr) for arr in arrays) or all(is_numpy(arr) for arr in arrays), "All input arrays must be of the same type"
 
@@ -70,6 +75,17 @@ def ones_like(x: Array) -> Array:
 def zeros_like(x: Array) -> Array:
     if is_tensor(x): return torch.zeros_like(x)
     return np.zeros_like(x)
+
+def arange(x:Array,start:Any, stop:Any=None, step:int=1,dtype=None):
+    if stop is None:
+        stop = start
+        start = 0
+    if is_tensor(x): return torch.arange(start,stop,step,dtype=dtype)
+    return np.arange(start,stop,step,dtype=dtype)
+
+def full_like(x: Array, fill_value: Any,dtype:Any=None) -> Array:
+    if is_tensor(x): return torch.full_like(x,fill_value,dtype=dtype)
+    return np.full_like(a=x,fill_value=fill_value,dtype=dtype)
 
 def deep_copy(x:Array) -> Array:
     if is_tensor(x): return x.clone()
@@ -138,5 +154,14 @@ def logical_and(*arrays: Array) -> Array:
             result = torch.logical_and(result, arr)
         else:
             result = np.logical_and(result, arr)
+    return result
 
-    return result 
+def logical_not(x: Array) -> Array:
+    assert(is_array(x))
+    if is_tensor(x): return torch.logical_not(x)
+    return np.logical_not(x)
+
+def logical_xor(x: Array) -> Array:
+    assert(is_array(x))
+    if is_tensor(x): return torch.logical_xor(x)
+    return np.logical_xor(x)

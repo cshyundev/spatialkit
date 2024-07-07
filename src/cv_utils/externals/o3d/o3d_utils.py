@@ -59,13 +59,13 @@ def save_pcd(pcd: o3d.geometry.PointCloud, path: str):
     """
     o3d.io.write_point_cloud(path, pcd)
 
-def create_camera_model(fov: float, resolution: tuple, camera_pose: np.ndarray):
+def create_camera_model(fov: float, hw: tuple, camera_pose: np.ndarray):
     """
     Create a camera model visualization.
 
     Args:
         fov (float): Field of view in degrees.
-        resolution (tuple): Resolution of the camera as (width, height).
+        hw (tuple): Resolution of the camera as (height,width).
         camera_pose (np.ndarray): 4x4 transformation matrix representing the camera pose.
 
     Returns:
@@ -73,8 +73,7 @@ def create_camera_model(fov: float, resolution: tuple, camera_pose: np.ndarray):
     """
     # Calculate camera parameters
     fov_rad = math.radians(fov)
-    height = resolution[1]
-    width = resolution[0]
+    height,width = hw
     focal_length = height / (2 * math.tan(fov_rad / 2))
 
     # Apply camera pose

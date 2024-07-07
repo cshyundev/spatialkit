@@ -128,3 +128,28 @@ graph TD
     class metrics dependent;
     class solutions dependent;
 ```
+
+## 주석 스타일
+```python
+"""
+    Brief description of what the function does.
+
+    Args:
+        param1 (type, size): Description of param1.
+        param2 (type, size): Description of param2.
+        ...
+        paramN (type, size): Description of paramN.
+
+    Returns:
+        return_type (type, size): Description of the return value.
+
+    Details:
+        - Explanation of the first key detail.
+        - Explanation of the second key detail.
+        - ...
+        - Explanation of the nth key detail.
+
+    Example:
+        example_code = function_name(param1_value, param2_value, ...)
+    """
+```

@@ -22,6 +22,8 @@ class RotType(Enum):
             return RotType.QUAT_XYZW
         elif type_str == 'QUAT_WXYZ':
             return RotType.QUAT_WXYZ
+        elif type_str == 'RPY':
+            return RotType.RPY
         else:
             return RotType.NONE
 
