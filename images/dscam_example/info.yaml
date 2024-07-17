@@ -1,0 +1,9 @@
+# https://github.com/matsuren/dscamera/blob/master/example/calibration.json
+calib:
+  image_size: [640,480]
+  cam_type: 'DOUBLESPHERE'
+  principal_point: [318.86121757059797,235.7432966284313]
+  focal_length: [122.5533262583915,121.79271712838818]
+  xi: -0.02235598738719681
+  alpha: 0.562863934931952
+  fov_deg: 180.

@@ -1,13 +1,11 @@
-import os.path as osp
 import numpy as np
-from cv_utils.utils.file_utils import read_yaml, read_image
-from cv_utils.core.geometry import Transform, Rotation
-from cv_utils.core.geometry import compute_fundamental_matrix, compute_essential_matrix
-from cv_utils import RotType 
-from cv_utils.core.geometry.camera import PerpectiveCamera, OpenCVCamera, RadialCamera
-from cv_utils.utils.logger import *
-from cv_utils.vis.point_selector import DoubleImagesPointSelector
-from cv_utils.vis.image_utils import *
+from cv_utils.utils.io import read_yaml, read_image
+from cv_utils.geom import Transform, Rotation
+from cv_utils.geom import compute_fundamental_matrix, compute_essential_matrix
+from cv_utils.geom.rotation import RotType
+from cv_utils.geom.camera import PerpectiveCamera, OpenCVFisheyeCamera, RadialCamera
+from cv_utils.common.logger import *
+from cv_utils.utils.point_selector import DoubleImagesPointSelector
 import absl.app as app
 
 
@@ -51,7 +49,7 @@ def parse_yaml(file_path):
         if camera_model == 'pinhole':
             cam = PerpectiveCamera.from_K(K,image_size,distortion_params)
         elif cam == 'opencv_fisheye':
-            cam = OpenCVCamera.from_K_D(K,image_size,distortion_params)
+            cam = OpenCVFisheyeCamera.from_K_D(K,image_size,distortion_params)
         # Parse extrinsic parameters
         rotation_type = extrinsic.get('rotation_type')
         try:
@@ -153,9 +151,6 @@ def main(unused_args):
         image2 = draw_circle(image2,pt2,1,rgb,2)
 
     show_two_images(image1,image2)
-
-    
-   
 
 
 if __name__ == "__main__":

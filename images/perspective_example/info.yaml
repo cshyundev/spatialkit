@@ -1,0 +1,8 @@
+# https://medium.com/analytics-vidhya/camera-calibration-with-opencv-f324679c6eb7
+calib:
+  image_size: [1280, 960]
+  cam_type: 'PERSPECTIVE'
+  principal_point: [651.26269237, 499.06652492]
+  focal_length: [560.33468243, 561.37973145]
+  radil: [-2.32951777e-01,6.17256346e-02, -7.54987702e-03]
+  tangential: [-1.83274571e-05, 3.39255772e-05]
