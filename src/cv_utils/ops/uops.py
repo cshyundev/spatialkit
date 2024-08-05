@@ -138,6 +138,15 @@ def eye(n:int, x: ArrayLike) -> ArrayLike:
     if is_tensor(x): return torch.eye(n)
     return np.eye(n)
 
+def transpose2d(x: ArrayLike) -> ArrayLike:
+    assert x.ndim == 2, f"Invalid shape for transpose: expected a 2D array, but got {x.shape}."
+    if is_tensor(x): return x.transpose(0, 1)
+    return x.T
+
+def swapaxes(x: ArrayLike, axis0:int,axis1:int) -> ArrayLike:
+    if is_tensor(x): return torch.swapaxes(x,axis0,axis1)
+    return np.swapaxes(x,axis0,axis1)
+
 def as_bool(x: ArrayLike) -> ArrayLike:
     if is_tensor(x): return x.type(torch.bool)
     return x.astype(bool)
@@ -205,11 +214,11 @@ def logical_xor(x: ArrayLike) -> ArrayLike:
     if is_tensor(x): return torch.logical_xor(x)
     return np.logical_xor(x)
 
-def allclose(x:ArrayLike, y:ArrayLike):
+def allclose(x:ArrayLike, y:ArrayLike,rtol:float=0.00001,atol:float=1e-8):
     assert type(x) == type(y)
-    if is_tensor(x): return torch.allclose(x,y)
-    return np.allclose(x,y)
+    if is_tensor(x): return torch.allclose(x,y,rtol=rtol,atol=atol)
+    return np.allclose(x,y,rtol=rtol,atol=atol)
 
-def isclose(x:ArrayLike, y:Any):
-    if is_tensor(x): return torch.isclose(x,y)
-    return np.isclose(x,y)
+def isclose(x:ArrayLike, y:Any,rtol:float=0.00001,atol:float=1e-8):
+    if is_tensor(x): return torch.isclose(x,y,rtol=rtol,atol=atol)
+    return np.isclose(x,y,rtol=rtol,atol=atol)

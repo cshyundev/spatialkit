@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-from cv_utils.core.geom.camera import *
-from cv_utils.core.ops.uops import *
-from cv_utils.core.ops.umath import *
+from cv_utils.geom.camera import *
+from cv_utils.ops.uops import *
+from cv_utils.ops.umath import *
 
 class TestCamera(unittest.TestCase):
     """
@@ -11,7 +11,7 @@ class TestCamera(unittest.TestCase):
         2. OpenCVFisheye Camera 
         3. ThinPrismFisheye Camera
 
-    Excluded Camera class fir Test
+    Excluded Camera class
         1. DoubleSphereCamera
         2. OmnidirectionalCamera
         3. EquirectangularCamera
@@ -47,7 +47,7 @@ class TestCamera(unittest.TestCase):
         }
 
         self.cams = {
-           "pinhole":PerpectiveCamera(perspective_cam_dict),
+           "pinhole":PerspectiveCamera(perspective_cam_dict),
            "opencv":OpenCVFisheyeCamera(opncv_fisheye_cam_dict),
            "thinprism":ThinPrismFisheyeCamera(thin_prism_cam_dict)
         }

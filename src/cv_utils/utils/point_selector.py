@@ -35,7 +35,7 @@ class DoubleImagesPointSelector:
         self.zoom_image_coords = None  # To store the coordinates of the zoomed area
         self.original_point = None  # To store the original selected point coordinates for zoom window
 
-        self.init_zoom()
+        self._init_zoom()
         self.connect()
 
     def connect(self):
@@ -48,11 +48,11 @@ class DoubleImagesPointSelector:
         self.ax2.set_title('Right Image: Waiting for Left')
         self.ax2.axis('off')
 
-        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.onkey)
+        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self._onclick)
+        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self._onkey)
         plt.show()
 
-    def init_zoom(self):
+    def _init_zoom(self):
         """Initialize the zoom area with a placeholder."""
         placeholder = np.full((self.zoom_size * 2, self.zoom_size * 2, 3), 128, dtype=np.uint8)  # Gray placeholder
         self.ax1_zoom.imshow(placeholder)
@@ -63,16 +63,16 @@ class DoubleImagesPointSelector:
         self.ax2_zoom.set_title('Right Zoom Window')
         self.ax2_zoom.axis('off')
 
-    def onclick(self, event):
+    def _onclick(self, event):
         if event.inaxes in [self.ax1, self.ax2]:
             if event.inaxes == self.ax1 and self.point_count < self.num_points and self.selected_left is None:
-                self.update_zoom_image(event.xdata, event.ydata, self.left_image, 'Left')
+                self._update_zoom_image(event.xdata, event.ydata, self.left_image, 'Left')
             elif event.inaxes == self.ax2 and self.selected_left is not None:
-                self.update_zoom_image(event.xdata, event.ydata, self.right_image, 'Right')
+                self._update_zoom_image(event.xdata, event.ydata, self.right_image, 'Right')
         elif event.inaxes in [self.ax1_zoom, self.ax2_zoom]:
-            self.adjust_point_in_zoom(event)
+            self._adjust_point_in_zoom(event)
 
-    def update_zoom_image(self, x, y, image, image_side):
+    def _update_zoom_image(self, x, y, image, image_side):
         x0, x1 = int(max(0, x - self.zoom_size)), int(min(image.shape[1], x + self.zoom_size))
         y0, y1 = int(max(0, y - self.zoom_size)), int(min(image.shape[0], y + self.zoom_size))
         zoom_img = image[y0:y1, x0:x1]
@@ -88,7 +88,7 @@ class DoubleImagesPointSelector:
         ax_zoom.axis('off')
         self.fig.canvas.draw()
 
-    def adjust_point_in_zoom(self, event):
+    def _adjust_point_in_zoom(self, event):
         if self.zoom_image_coords:
             x0, y0, original_x, original_y = self.zoom_image_coords
             new_x, new_y = x0 + event.xdata, y0 + event.ydata
@@ -110,13 +110,13 @@ class DoubleImagesPointSelector:
                     self.ax2.set_title('Selection Completed - Press "r" to reset or "q" to quit')
             self.fig.canvas.draw()
 
-    def onkey(self, event):
+    def _onkey(self, event):
         if event.key == 'r':
-            self.reset()
+            self._reset()
         elif event.key == 'q':
             plt.close(self.fig)
 
-    def reset(self):
+    def _reset(self):
         """Reset the point selection."""
         self.points = []
         self.point_count = 0
@@ -132,8 +132,11 @@ class DoubleImagesPointSelector:
         self.ax2.imshow(self.right_image)
         self.ax2.set_title('Right Image: Waiting for Left')
         self.ax2.axis('off')
-        self.init_zoom()
+        self._init_zoom()
         self.fig.canvas.draw()
+
+    def reset(self):
+        self._reset()
 
     def get_points(self):
         pts1 = [(x1, y1) for (x1, y1, _, _) in self.points]
@@ -165,7 +168,7 @@ class SingleImagePointSelector:
         self.zoom_size = 40  # Size of the zoom window around the selected point
         self.zoom_image_coords = None  # To store the coordinates of the zoomed area
 
-        self.init_zoom()
+        self._init_zoom()
         self.connect()
 
     def connect(self):
@@ -174,24 +177,24 @@ class SingleImagePointSelector:
         self.ax.set_title('Image: Select Point 0 of {}'.format(self.num_points))
         self.ax.axis('off')
 
-        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.onkey)
+        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self._onclick)
+        self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self._onkey)
         plt.show()
 
-    def init_zoom(self):
+    def _init_zoom(self):
         """Initialize the zoom area with a placeholder."""
         placeholder = np.full((self.zoom_size * 2, self.zoom_size * 2, 3), 128, dtype=np.uint8)  # Gray placeholder
         self.ax_zoom.imshow(placeholder)
         self.ax_zoom.set_title('Zoom Window')
         self.ax_zoom.axis('off')
 
-    def onclick(self, event):
+    def _onclick(self, event):
         if event.inaxes == self.ax:
-            self.update_zoom_image(event.xdata, event.ydata)
+            self._update_zoom_image(event.xdata, event.ydata)
         elif event.inaxes == self.ax_zoom:
-            self.adjust_point_in_zoom(event)
+            self._adjust_point_in_zoom(event)
 
-    def update_zoom_image(self, x, y):
+    def _update_zoom_image(self, x, y):
         x0, x1 = int(max(0, x - self.zoom_size)), int(min(self.image.shape[1], x + self.zoom_size))
         y0, y1 = int(max(0, y - self.zoom_size)), int(min(self.image.shape[0], y + self.zoom_size))
         zoom_img = self.image[y0:y1, x0:x1]
@@ -204,7 +207,7 @@ class SingleImagePointSelector:
         self.ax_zoom.axis('off')
         self.fig.canvas.draw()
 
-    def adjust_point_in_zoom(self, event):
+    def _adjust_point_in_zoom(self, event):
         if self.zoom_image_coords:
             x0, y0, _, _ = self.zoom_image_coords
             new_x, new_y = x0 + event.xdata, y0 + event.ydata
@@ -219,13 +222,13 @@ class SingleImagePointSelector:
             self.zoom_image_coords = None
             self.fig.canvas.draw()
 
-    def onkey(self, event):
+    def _onkey(self, event):
         if event.key == 'r':
-            self.reset()
+            self._reset()
         elif event.key == 'q':
             plt.close(self.fig)
 
-    def reset(self):
+    def _reset(self):
         """Reset the point selection."""
         self.points = []
         self.point_count = 0
@@ -234,8 +237,11 @@ class SingleImagePointSelector:
         self.ax.imshow(self.image)
         self.ax.set_title('Image: Select Point 0 of {}'.format(self.num_points))
         self.ax.axis('off')
-        self.init_zoom()
+        self._init_zoom()
         self.fig.canvas.draw()
+    
+    def reset(self):
+        self._reset()
 
     def get_points(self):
         return self.points

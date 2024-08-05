@@ -9,7 +9,7 @@ from PIL import Image
 import os
 import os.path as osp
 from ..common.logger import  LOG_ERROR
-
+import cv2 as cv
 
 def read_tiff(path: str) -> np.ndarray:
     """
@@ -138,6 +138,60 @@ def write_image(image:np.ndarray, path: str):
     except Exception as e:
         LOG_ERROR(f"Failed to write Image file: {path}. Error: {e}")
 
+def read_pgm(path: str, mode:Optional[str]=None) -> np.ndarray:
+    """
+        Reads a PGM image file.
+
+        Args:
+            path (str): Path to the PGM image file.
+            mode (Optional[str]): Mode to convert the image using PIL.
+
+        Return:
+            np.ndarray: Image data read from the file.
+
+        Details:
+        - 'L' - (8-bit pixels, black and white)
+        - 'RGB' - (3x8-bit pixels, true color)
+        - 'RGBA' - (4x8-bit pixels, true color with transparency mask)
+        - 'CMYK' - (4x8-bit pixels, color separation)
+        - 'YCbCr' - (3x8-bit pixels, color video format)
+        - 'I' - (32-bit signed integer pixels)
+        - 'F' - (32-bit floating point pixels)
+            
+        Example:
+            image = read_pgm('example.pgm', mode='L')
+    """
+
+    try:
+        with open(path, 'rb') as f:
+            image = Image.open(f)
+            if mode is not None:
+                image = image.convert(mode)
+        return np.array(image)
+    
+    except (FileNotFoundError, IsADirectoryError) as e:
+        LOG_ERROR(f"File not found or is a directory: {path}. Error: {e}")
+    except ValueError as e:
+        LOG_ERROR(f"Value error: {e}")
+    except Exception as e:
+        LOG_ERROR(f"Failed to read Image file: {path}. Error: {e}.")
+    return None
+
+def write_pgm(image: np.ndarray, path: str):
+    """
+        Writes numpy array image data to a PGM file.
+
+        Args:
+            image (np.ndarray): Image data to write.
+            path (str): Path to save the PGM image file.
+    
+        Example:
+            image = np.random.random((100, 100)).astype(np.uint8)
+            write_pgm(image, 'output.pgm')
+    """
+    img = Image.fromarray(image)
+    img.save(path)
+
 def read_json(path: str) -> Dict[str,Any]:
     """
         Reads a JSON file.
@@ -229,3 +283,60 @@ def write_yaml(path:str, dict:Dict[str,Any]):
     except Exception as e:
         LOG_ERROR(f"Failed to write YAML file: {path}. Error: {e}")
 
+def write_video_from_image_paths(image_paths: List[str], output_path:str, fps:int = 30, codec:str = 'mp4v') -> None:
+    """
+        Write a video from a list of image file paths.
+
+        Args:
+            image_paths (List[str]): List of image file paths.
+            output_path (str): Output path for the video file.
+            fps (int): Frames per second for the video. Default is 30.
+            codec (str): FourCC code for the video codec. Default is 'mp4v'.
+    """
+    if not image_paths:
+        raise ValueError("The image paths list is empty")
+
+    first_image = read_image(image_paths[0])
+    if first_image is None:
+        return
+    
+    height, width = first_image.shape[0:2]
+
+    # Initialize the video writer
+    fourcc = cv.VideoWriter_fourcc(*codec)
+    video_writer = cv.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    for image_path in image_paths:
+        image = read_image(image_path)
+        if image is None:
+            return
+        if image.ndim == 3: image = cv.cvtColor(image,cv.COLOR_RGB2BGR)        
+        video_writer.write(image)
+    video_writer.release()
+
+def write_video_from_images(images:List[np.ndarray], output_path:str, fps:int = 30, codec:str = 'mp4v') -> None:
+    """
+        Write a video from a list of images.
+
+        Args:
+            images (List[np.ndarray]): List of images.
+            output_path (str): Output path for the video file.
+            fps (int): Frames per second for the video. Default is 30.
+            codec (str): FourCC code for the video codec. Default is 'mp4v'.
+    """
+
+    # Get the size from the first image
+    first_image = images[0]
+    height, width = first_image.shape[0:2]
+
+    # Initialize the video writer
+    fourcc = cv.VideoWriter_fourcc(*codec)
+    video_writer = cv.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    for image in images:
+        if not isinstance(image, np.ndarray):
+            LOG_ERROR("All items in the images list must be numpy arrays.")
+            return
+        if image.ndim == 3: image = cv.cvtColor(image,cv.COLOR_RGB2BGR)
+        video_writer.write(image)
+    video_writer.release()

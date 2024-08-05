@@ -78,10 +78,10 @@ class Pose:
         assert (is_array(t)), ('translation must be array type(Tensor or Numpy).')
         assert(t.size == 3), ('size of translation must be 3.')
 
-        if t.shape == (3,): t = t.reshape(1,3)
+        t = t.reshape(1,3)
         
         self._t:ArrayLike = convert_numpy(t)
-        self.rot:Rotation = rot      
+        self._rot:Rotation = rot      
     
     @property
     def t(self) -> np.ndarray:
@@ -92,7 +92,6 @@ class Pose:
         assert(is_array(rot_vec)), 'rotation vector must be ArrayLike type(Tensor or Numpy)'
         assert(is_array(t)), 'translation vector must be ArrayLike type(Tensor or Numpy)'
         assert(rot_vec.shape[-1] == 3), 'Invalid Shape. rotation vector must be (3,)'
-        assert(rot_vec.shape[-1] == 3), 'Invalid Shape. translation vector must be (3,)'
         rot = Rotation.from_so3(rot_vec)
         return Pose(t,rot)
 
@@ -101,27 +100,20 @@ class Pose:
         assert is_array(mat4), ('mat4 must be array type(Tensor or Numpy)')
         assert((mat4.shape[-1] == 4) and (mat4.shape[-2] == 3 or mat4.shape[-2] == 4)), ('Invalid Shape. The shape of mat4 must be (3,4) or (4,4)')
         return Pose(mat4[0:3,3], Rotation.from_mat3(mat4[:3,:3]))
-    
-    @staticmethod
-    def from_dict(dict: Dict[str, Any]) -> 'Pose':
-        assert('camtoworld' in dict), ("No Value Error. There is no Cam to World Transform in Dict.")
-        mat = np.array(dict['camtoworld']) 
-        return Pose.from_mat(mat)        
-    
+        
     def rot_mat(self) -> np.ndarray:
-        return self.rot.mat()
+        return self._rot.mat()
     
     def mat34(self) -> np.ndarray:
-        return concat([self.rot_mat(), transpose2d(self.t)], 1)
+        return concat([self.rot_mat(), transpose2d(self.t)], dim=1)
     
     def mat44(self) -> np.ndarray:
         mat34 = self.mat34()
         last = np.array([0., 0., 0., 1.]).reshape(1,4)
-        if is_tensor(mat34): last = convert_tensor(last,mat34)        
-        return concat([mat34, last], 0)
+        return concat([mat34, last], dim=0)
     
     def rot_vec_t(self) -> Tuple[np.ndarray,np.ndarray]:
-        return self.rot.so3(), self.t
+        return self._rot.so3(), self.t
     
     def skew_t(self) -> np.ndarray:
         return vec3_to_skew(self.t)
@@ -130,39 +122,45 @@ class Pose:
         return self.t, self.rot_mat()
     
     def inverse(self) -> 'Pose':
-        R_inv = self.rot.inverse()
+        R_inv = self._rot.inverse()
         t_inv = -R_inv.apply_pts3d(transpose2d(self.t))
         return Pose(transpose2d(t_inv), R_inv)
 
 def interpolate_pose(pose1:Pose,pose2:Pose,t:float) -> Pose:
     """
         Interpolate Pose using Lerp and SLerp.
-        translation: linear interpolation(Lerp)
-        rotation: spherical linear interpolation(Slerp)
+        
         Args:
             pose1 (Pose): start Pose
             pose2 (Pose): end Pose
             t (float): interpolation parameter
+        
         Return:
             Interpolated Pose
+
+        Details:
+        - translation: linear interpolation(Lerp)
+        - rotation: spherical linear interpolation(Slerp)
     """
-    r = slerp(pose1.rot,pose2.rot,t)
+    r = slerp(pose1._rot,pose2._rot,t)
     trans1, trans2 = pose1.t, pose2.t
     trans = trans1 * (1.- t) + trans2 * t
     return Pose(t=trans,rot=r)
 
 def relative_pose(pose1:Pose, pose2:Pose) -> Pose:
     """
-    Calculate the relative pose from pose1 to pose2.
-    Args:
-        pose1(Pose): the first pose (reference pose)
-        pose2(Pose): the second pose
-    Return:
-        Pose, the relative pose from pose1 to pose2
+        Calculate the relative pose from pose1 to pose2.
+        
+        Args:
+            pose1(Pose): the first pose (reference pose)
+            pose2(Pose): the second pose
+        
+        Return:
+            Pose, the relative pose from pose1 to pose2
     """
     pose1_inv = pose1.inverse()
     
-    rel_rot = pose1_inv.rot * pose2.rot
-    rel_t = pose1_inv.t + pose1_inv.rot.apply_pts3d(pose2.t)
+    rel_rot = pose1_inv._rot * pose2._rot
+    rel_t = pose1_inv.t + pose1_inv._rot.apply_pts3d(pose2.t)
     
     return Pose(rel_t, rel_rot)    

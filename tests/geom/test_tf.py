@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-from cv_utils.core.geom.pose import Pose
-from cv_utils.core.geom.tf import Transform
-from cv_utils.core.geom.rotation import Rotation
-from cv_utils.core.ops.uops import *
-from cv_utils.core.ops.umath import *
+from cv_utils.geom.pose import Pose
+from cv_utils.geom.tf import Transform
+from cv_utils.geom.rotation import Rotation
+from cv_utils.ops.uops import *
+from cv_utils.ops.umath import *
 
 class TestTransform(unittest.TestCase):
 

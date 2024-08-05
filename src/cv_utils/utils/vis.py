@@ -124,7 +124,7 @@ def draw_circle(image:np.ndarray, pt2d:Tuple[int,int], radius:int=1,
         Draws a circle on the image.
 
         Args:
-            image (np.ndarray): Input image array.
+            image (np.ndarray, [H,W,3] or [H,W]): Input image array.
             pt2d (Tuple[int, int]): Center of the circle.
             radius (int): Radius of the circle. Default is 1.
             rgb (Optional[Tuple[int, int, int]]): Color of the circle in RGB. Default is random.
@@ -137,6 +137,7 @@ def draw_circle(image:np.ndarray, pt2d:Tuple[int,int], radius:int=1,
             image_with_circle = draw_circle(image, (50, 50), radius=5)
     """
     if rgb is None: rgb = tuple(np.random.randint(0,255,3).tolist())
+    pt2d = (int(pt2d[0]),int(pt2d[1]))
 
     return cv.circle(image, pt2d, radius, rgb, thickness)
 
@@ -164,13 +165,13 @@ def draw_line_by_points(image:np.ndarray, pt1: Tuple[int,int], pt2: Tuple[float,
 def draw_line_by_line(image:np.ndarray, line: Tuple[float,float,float],
                       rgb:Optional[Tuple[int,int,int]]=None, thickness:int=2) ->np.ndarray:
     """
-        Draw Line by (a,b,c). (a,b,c) means a line: ax + by + c = 0
+        Draw Line by (a,b,c), which (a,b,c) means a line: ax + by + c = 0
 
         Args:
-            image: (H,W,3) or (H,W), float
-            line: (3,), float, line parameter (a,b,c)
-            rgb: (3,), int, RGB color
-            thickness: scalar, int, thickness of the line
+            image (np.ndarray, [H,W,3] or [H,W]): Input image array.
+            line (Tuple[float], [3,]): line parameter (a,b,c)
+            rgb (Tuple[int], [3,] ): RGB color
+            thickness (int): thickness of the line
 
         Return:
             np.ndarray
@@ -235,6 +236,59 @@ def draw_lines(image, pts:List[Tuple[int,int]], rgb:Optional[Tuple[int,int,int]]
     for i in range(len(pts) - 1):
        cv.line(image, pts[i], pts[i + 1], rgb, thickness)
     return image
+
+def generate_rainbow_colors(num_colors: int):
+    """
+        Generates a list of RGB colors transitioning smoothly through the rainbow colors.
+
+        Arg:
+            num_colors (int): The number of colors to generate.
+
+        Return:
+            list (list of lists, [N,3]): A list of RGB colors, where each color is represented by a list of three integers [R, G, B].
+
+        Details:
+        - The function interpolates colors between red, orange, yellow, green, blue, and violet.
+        - The colors are generated in the RGB color space.
+
+        Example:
+            example_colors = generate_rainbow_colors(14)
+            # example_colors might output:
+            # [[255, 0, 0], [255, 51, 0], [255, 102, 0], [255, 153, 0], [255, 204, 0], [255, 255, 0], [204, 255, 0], [153, 255, 0], [0, 255, 0], [0, 204, 255], [0, 153, 255], [0, 102, 255], [0, 51, 255], [148, 0, 211]]
+    """
+    def interpolate_color(start_color, end_color, t):
+        # Interpolates between two colors
+        return start_color + (end_color - start_color) * t
+
+    rainbow_colors = [
+        np.array([255, 0, 0]),    # Red
+        np.array([255, 127, 0]),  # Orange
+        np.array([255, 255, 0]),  # Yellow
+        np.array([0, 255, 0]),    # Green
+        np.array([0, 0, 255]),    # Blue
+        np.array([75, 0, 130]),   # Indigo
+        np.array([148, 0, 211])   # Violet
+    ]
+
+    total_segments = len(rainbow_colors) - 1
+    colors = []
+
+    for i in range(total_segments):
+        start_color = rainbow_colors[i]
+        end_color = rainbow_colors[i + 1]
+        segment_colors = int(np.ceil(num_colors / total_segments))
+        
+        for t in np.linspace(0, 1, segment_colors, endpoint=False):
+            colors.append(interpolate_color(start_color, end_color, t))
+    
+    # Adjust the final colors list to have the exact num_colors
+    if len(colors) < num_colors:
+        colors.append(rainbow_colors[-1])
+    elif len(colors) > num_colors:
+        colors = colors[:num_colors]
+
+    colors = [[int(c) for c in color] for color in colors]  # Convert to integer RGB values
+    return colors
 
 def show_image(image:np.ndarray, title:str="image"):
     """

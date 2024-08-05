@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from scipy.spatial.transform import Rotation as SciPyRotation
-from cv_utils.core.geom.rotation import *
+from cv_utils.geom.rotation import *
 
 class TestRotation(unittest.TestCase):
 

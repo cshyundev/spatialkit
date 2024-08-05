@@ -1,9 +1,9 @@
 import unittest
 import numpy as np
-from cv_utils.core.geom.pose import SE3_to_se3, se3_to_SE3, Pose
-from cv_utils.core.geom.rotation import Rotation
-from cv_utils.core.ops.uops import *
-from cv_utils.core.ops.umath import *
+from cv_utils.geom.pose import SE3_to_se3, se3_to_SE3, Pose
+from cv_utils.geom.rotation import Rotation
+from cv_utils.ops.uops import *
+from cv_utils.ops.umath import *
 
 
 class TestPose(unittest.TestCase):

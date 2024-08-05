@@ -28,6 +28,8 @@ tensor(2.5000)
 from .uops import *
 from scipy.linalg import expm
 from ..common.constant import EPSILON
+from ..common.logger import *
+
 
 # Basic Mathematical Operations
 def abs(x: ArrayLike) -> ArrayLike:
@@ -48,6 +50,11 @@ def dot(x: ArrayLike, y: ArrayLike) -> ArrayLike:
     assert(type(x) == type(y)), f"Invalid type: expected same type for both arrays, but got {type(x)} and {type(y)}"
     if is_tensor(x): return torch.dot(x, y)
     return np.dot(x, y)
+
+def qr(x :ArrayLike) -> ArrayLike:
+    assert x.ndim == 2, f"Invalid shape for QR: expected a 2D matrix, but got {x.shape}."
+    if is_tensor(x): return torch.linalg.qr(x)
+    return np.linalg.qr(x)
 
 def svd(x: ArrayLike) -> ArrayLike:
     assert x.ndim == 2, f"Invalid shape for SVD: expected a 2D matrix, but got {x.shape}."
@@ -76,11 +83,6 @@ def normalize(x: ArrayLike, ord:Optional[Union[int, str]]=None, dim:Optional[int
     n = norm(x=x, ord=ord, dim=dim, keepdim=False)
     return x / (n + eps)
 
-def transpose2d(x: ArrayLike) -> ArrayLike:
-    assert x.ndim == 2, f"Invalid shape for transpose: expected a 2D array, but got {x.shape}."
-    if is_tensor(x): return x.transpose(0, 1)
-    return x.T
-
 def matmul(x: ArrayLike, y: ArrayLike) -> ArrayLike:
     assert x.ndim >= 1 and y.ndim >= 1, f"Invalid shape: expected at least 1D arrays, but got {x.shape} and {y.shape}."
     assert x.shape[-1] == y.shape[0], f"Invalid shape for matmul: x dimensions {x.shape[-1]}, y dimensions {y.shape[0]}."
@@ -96,18 +98,6 @@ def trace(x: ArrayLike) -> ArrayLike:
     assert x.ndim == 2, f"Invalid shape for trace: expected a 2D array, but got {x.shape}."
     if is_tensor(x): return torch.trace(x)
     return np.trace(x)
-
-def vec3_to_skew(x: ArrayLike) -> ArrayLike:
-    assert (x.shape == (3,) or x.shape == (1,3)), f"Invalid shape. Shape of vector must be (3,) or (1,3), but got {str(x.shape)}"
-    if x.shape == (1,3): x = reduce_dim(x,0)
-    wx = x[0].item()
-    wy = x[1].item()
-    wz = x[2].item()
-    skew_x = np.array([[0., -wz, wy],
-                    [wz,  0, -wx],
-                    [-wy, wx,  0]])
-    if is_tensor(x): skew_x = convert_tensor(skew_x, x)
-    return skew_x
 
 def diag(x: ArrayLike) -> ArrayLike:
     assert x.ndim == 2, f"Invalid shape for diag: expected a 2D array, but got {x.shape}."
@@ -204,3 +194,55 @@ def solve_linear_system(A:ArrayLike, b:Optional[ArrayLike]=None):
         _,s,vt = svd(A)
         null_space = transpose2d(vt)[:, s < EPSILON]
         return null_space
+    
+# Computer Vision
+def vec3_to_skew(x: ArrayLike) -> ArrayLike:
+    assert (x.shape == (3,) or x.shape == (1,3)), f"Invalid shape. Shape of vector must be (3,) or (1,3), but got {str(x.shape)}"
+    if x.shape == (1,3): x = reduce_dim(x,0)
+    wx = x[0].item()
+    wy = x[1].item()
+    wz = x[2].item()
+    skew_x = np.array([[0., -wz, wy],
+                    [wz,  0, -wx],
+                    [-wy, wx,  0]])
+    if is_tensor(x): skew_x = convert_tensor(skew_x, x)
+    return skew_x
+
+def homo(x: ArrayLike) -> ArrayLike:
+    """
+        Convert Euclidean coordinates to Homogeneous coordinates.
+
+        Arg:
+            x (ArrayLike, [2,N] or [3,N]): Euclidean coordinates.
+
+        Return:
+            (ArrayLike, [3,N] or [4,N]): Converted homogeneous coordinates.
+        
+        Details:
+        - [x y] -> [x y 1]
+        - [x y z] -> [x y z 1]
+    """
+    if x.ndim != 2 and x.shape[0] != 2 and x.shape[0] != 3:
+        LOG_ERROR(f"Invalid Shape. Input Shape must be (2,N) or (3,N), but got {x.shape}")
+        raise ValueError
+    return concat([x, ones_like(x[0:1,:])], 0)
+
+def dehomo(x: ArrayLike) -> ArrayLike:
+    """
+        Convert Homogeneous coordinates to Euclidean coordinates.
+
+        Arg:
+            x (ArrayLike, [3,N] or [4,N]): Homogeneous coordinates.
+
+        Return:
+            (ArrayLike, [2,N] or [3,N]): Converted euclidean coordinates.
+        
+        Details:
+        - [x y z] -> [x/z y/z]
+        - [x y z w] -> [x/w y/w z/w]
+    """
+    if x.ndim != 2 and x.shape[0] != 3 and x.shape[0] != 4:
+        LOG_ERROR(f"Invalid Shape. Input Shape must be (3,N) or (4,N), but got {x.shape}")
+        raise ValueError
+    euc_coords = x[:-1,:] / x[-1,:]
+    return euc_coords

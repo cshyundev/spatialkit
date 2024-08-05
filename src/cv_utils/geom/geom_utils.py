@@ -29,83 +29,83 @@ from .camera import *
 from typing import *
 import cv2 as cv
 from scipy.ndimage import map_coordinates
+from ..common.logger import *
 
-def compute_essential_matrix(K1: Optional[np.ndarray]=None, K2: Optional[np.ndarray]=None,F: Optional[np.ndarray]=None,
-                             rel_p:Optional[Union[Pose,Transform]]=None) -> np.ndarray:
+def compute_essential_matrix_from_pose(rel_p: Union[Pose,Transform]) -> np.ndarray:
     """
-        Compute the essential matrix from either the fundamental matrix or relative camera pose.
+        Compute the essential matrix from the relative camera pose.
+
+        Args:
+            rel_p (Pose or Transform): Relative pose object containing rotation and translation between cameras.
+
+        Return:
+            E (np.ndarray, [3,3]): The computed essential matrix (3x3).
+    """
+    skew_t = rel_p.skew_t()
+    r_mat = rel_p.rot_mat()
+    return convert_numpy(skew_t @ r_mat)
+
+def compute_essential_matrix_from_fundamental(K1: np.ndarray, K2: np.ndarray, F: np.ndarray) -> np.ndarray:
+    """
+        Compute the essential matrix from the fundamental matrix and intrinsic camera matrices.
 
         Args:
             K1 (np.ndarray, [3,3]): Intrinsic camera matrix for the first camera.
             K2 (np.ndarray, [3,3]): Intrinsic camera matrix for the second camera.
             F  (np.ndarray, [3,3]): Fundamental matrix.
-            rel_p (Pose or Tansform): Relative pose object containing rotation and translation between cameras.
 
         Return:
             E (np.ndarray, [3,3]): The computed essential matrix (3x3).
-
-        Raises:
-            AssertionError: If neither the fundamental matrix nor the relative pose is provided.
-
-        Details:
-        - Case 1: Fundamental matrix and intrinsic matrices(E = K2^T @ F @ K1).
-        - Case 2: Decompose Pose(E = [t]×R).
     """
-    assert (F is not None or rel_p is not None), "For computing essential matrix, Fundamental Matrix or Relative Pose is required."
+    return K2.T @ F @ K1
 
-    if F is not None:
-        return K2.T @ F @ K1
-    else:
-        # E = [t]×R  
-        skew_t = rel_p.skew_t()
-        r_mat = rel_p.rot_mat()
-        return convert_numpy(skew_t @r_mat)
-
-def eight_point_algorithm(pts1:Union[np.ndarray, List[Tuple[int]]], pts2:Union[np.ndarray,List[Tuple[int]]]):
+def compute_fundamental_matrix_from_points(pts1: Union[np.ndarray, List[Tuple[int]]], 
+                                           pts2: Union[np.ndarray, List[Tuple[int]]]) -> np.ndarray:
     """
-        Compute the fundamental matrix using the 8-point algorithm from point correspondences.
+    Compute the fundamental matrix given point correspondences.
 
-        Args:
-            pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [N,2]): Corresponding points in each image.
-        
-        Return:
-            F (np.ndarray, [3,3]): The computed fundamental matrix 
-                    after enforcing a rank-2 constraint.
+    Args:
+        pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points in each image.
+
+    Return:
+        F (np.ndarray, [3,3]): The computed fundamental matrix.
+
+    Raises:
+        ValueError: If insufficient or incorrect data is provided.
     """
     # Ensure pts1 and pts2 are numpy arrays
     if isinstance(pts1, list):
-        pts1 = np.array(pts1)
+        pts1 = np.array(pts1).T
     if isinstance(pts2, list):
-        pts2 = np.array(pts2)
-    assert(pts1.shape == pts2.shape)
+        pts2 = np.array(pts2).T
 
-    n = pts1.shape[0]
+    assert pts1.shape == pts2.shape, "Point arrays must have the same shape."
+    assert pts1.shape[0] == 2, "Point arrays must have two coordinates."
+    assert pts1.shape[1] >= 8, f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
 
-    A = np.zeros((n, 9))
-    for i in range(n):
-        x1, y1 = pts1[i]
-        x2, y2 = pts2[i]
-        A[i] = [x1*x2, x1*y2, x1, y1*x2, y1*y2, y1, x2, y2, 1]
-
-    U, S, Vt = svd(A)
+    # Construct matrix A for linear equation system
+    x1 = pts1[0,:].reshape(-1,1)
+    y1 = pts1[1,:].reshape(-1,1)
+    x2 = pts2[0,:].reshape(-1,1)
+    y2 = pts2[1,:].reshape(-1,1)
+    
+    A = np.concatenate([x1 * x2, x1 * y2, x1, y1 * x2, y1 * y2, y1, x2, y2,ones_like(x1)],1)
+    # Solve using SVD
+    _, _, Vt = svd(A)
     F = Vt[-1].reshape(3, 3)
 
     # Enforce the rank-2 constraint
     U, S, Vt = svd(F)
     S[-1] = 0
-    F = U @ diag(S) @ Vt
+    F = U @ np.diag(S) @ Vt
+
     return F
 
-def compute_fundamental_matrix(pts1: Optional[Union[np.ndarray, List[Tuple[int]]]]=None,
-                               pts2: Optional[Union[np.ndarray, List[Tuple[int]]]] = None,
-                               K1: Optional[np.ndarray] = None, 
-                               K2: Optional[np.ndarray] = None, 
-                               E: Optional[np.ndarray] = None) -> np.ndarray:
+def compute_fundamental_matrix_from_essential(K1: np.ndarray, K2: np.ndarray, E: np.ndarray) -> np.ndarray:
     """
-        Compute the fundamental matrix given point correspondences or camera intrinsics and an essential matrix.
+        Compute the fundamental matrix from the essential matrix and intrinsic camera matrices.
 
         Args:
-            pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [N,2]): Corresponding points in each image.
             K1, K2 (np.ndarray, [3,3]): Intrinsic matrices of the two cameras.
             E (np.ndarray, [3,3]): Essential matrix.
 
@@ -113,57 +113,16 @@ def compute_fundamental_matrix(pts1: Optional[Union[np.ndarray, List[Tuple[int]]
             F (np.ndarray, [3,3]): The computed fundamental matrix.
 
         Raises:
-        - ValueError: If insufficient or incorrect data is provided.
-
-        Details
-        - Case 1: Computing fundamental matrix from corresponding points.
-        - Case 2: Compose essential matrix and intrinsic matrices (F = K^-T @ E K^-1).
+            ValueError: If insufficient or incorrect data is provided.
     """
-    if pts1 is not None and pts2 is not None:
-        # Ensure pts1 and pts2 are numpy arrays
-        if isinstance(pts1, list):
-            pts1 = np.array(pts1)
-        if isinstance(pts2, list):
-            pts2 = np.array(pts2)
-
-        assert pts1.shape[1] == 2 and pts2.shape[1] == 2, "Point arrays must have two coordinates."
-        assert pts1.shape == pts2.shape, "Point arrays must have the same shape."
-        assert pts1.shape[0] >= 8, f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
-
-
-        # Normalize points
-        pts1 = np.vstack((pts1, np.ones((1, pts1.shape[1]))))
-        pts2 = np.vstack((pts2, np.ones((1, pts2.shape[1]))))
-
-        # Construct matrix A for linear equation system
-        A = np.zeros((pts1.shape[1], 9))
-        for i in range(pts1.shape[1]):
-            x1, y1, _ = pts1[:, i]
-            x2, y2, _ = pts2[:, i]
-            A[i] = [x1*x2, x1*y2, x1, y1*x2, y1*y2, y1, x2, y2, 1]
-
-        # Solve using SVD
-        _, _, Vt = svd(A)
-        F = Vt[-1].reshape(3, 3)
-
-        # Enforce the rank-2 constraint
-        U, S, Vt = svd(F)
-        S[-1] = 0
-        F = U @ diag(S) @ Vt
-
-        return F
-
-    elif K1 is not None and K2 is not None and E is not None:
-        assert K1.shape == (3, 3) and K2.shape == (3, 3) and E.shape == (3, 3), "Intrinsic and Essential matrices must be 3x3."
-        # Compute fundamental matrix from essential matrix
-        F = inv(K2).T @ E @ inv(K1)
-        return F
-    else:
-        raise ValueError("Insufficient or incorrect data provided. Please provide either point correspondences or intrinsics with an essential matrix.")
+    assert K1.shape == (3, 3) and K2.shape == (3, 3) and E.shape == (3, 3), "Intrinsic and Essential matrices must be 3x3."
+    # Compute fundamental matrix from essential matrix
+    F = inv(K2).T @ E @ inv(K1)
+    return F
 
 def compute_fundamental_matrix_using_ransac(pts1: Optional[Union[np.ndarray, List[Tuple[int]]]],
                                             pts2: Optional[Union[np.ndarray, List[Tuple[int]]]],
-                                            threshold:float=1e-3,
+                                            threshold:float=1e-2,
                                             max_iterations:int=1000):
     """
         Compute the fundamental matrix given point correspondences using the RANSAC algorithm.
@@ -178,48 +137,30 @@ def compute_fundamental_matrix_using_ransac(pts1: Optional[Union[np.ndarray, Lis
             best_inliers (int): Number of inliers for the best fundamental matrix.
     """
     # Ensure pts1 and pts2 are numpy arrays
-    if isinstance(pts1, list): pts1 = np.array(pts1)
-    if isinstance(pts2, list): pts2 = np.array(pts2)
-    assert pts1.shape[1] == 2 and pts2.shape[1] == 2, "Point arrays must have two coordinates."
+    if isinstance(pts1, list): pts1 = np.array(pts1).T
+    if isinstance(pts2, list): pts2 = np.array(pts2).T
     assert pts1.shape == pts2.shape, "Point arrays must have the same shape."
-    assert pts1.shape[0] >= 8, f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
-
-    def _normalize_points(pts):
-        """ Normalize the points to improve numerical stability for SVD. """
-        mean = np.mean(pts, axis=0)
-        std = np.std(pts)
-        T = np.array([
-            [1/std, 0, -mean[0]/std],
-            [0, 1/std, -mean[1]/std],
-            [0, 0, 1]
-        ])
-        pts_normalized = np.dot(T, np.vstack((pts.T, np.ones(pts.shape[0]))))
-        return pts_normalized[:2].T, T
+    assert pts1.shape[0] == 2, "Point arrays must have two coordinates."
+    assert pts1.shape[1] >= 8, f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
 
     best_F = None
     best_inliers = 0
 
+    num_pts = pts1.shape[1]
     for _ in range(max_iterations):
         # Randomly select 8 points for the minimal sample set
-        indices = np.random.choice(pts1.shape[0], 8, replace=False)
-        sample_pts1 = pts1[indices]
-        sample_pts2 = pts2[indices]
-
-        # Normalize points
-        sample_pts1_norm, T1 = _normalize_points(sample_pts1)
-        sample_pts2_norm, T2 = _normalize_points(sample_pts2)
+        indices = np.random.choice(num_pts, 8, replace=False)
+        sample_pts1 = pts1[:,indices]
+        sample_pts2 = pts2[:,indices]
 
         # Compute the fundamental matrix
-        F_norm = eight_point_algorithm(sample_pts1_norm, sample_pts2_norm)
-
-        # Denormalize the fundamental matrix
-        F = T2.T @ F_norm @ T1
+        F = compute_fundamental_matrix_from_points(sample_pts1, sample_pts2)
 
         # Calculate the number of inliers
         inliers = 0
-        for i in range(pts1.shape[0]):
-            pt1 = np.append(pts1[i], 1)
-            pt2 = np.append(pts2[i], 1)
+        for i in range(num_pts):
+            pt1 = np.append(pts1[:,i], 0)
+            pt2 = np.append(pts2[:,i], 0)
             error = abs(pt2.T @ F @ pt1)
             if error < threshold:
                 inliers += 1
@@ -231,7 +172,7 @@ def compute_fundamental_matrix_using_ransac(pts1: Optional[Union[np.ndarray, Lis
 
     return best_F, best_inliers
 
-def recover_pose(E: np.ndarray) -> Tuple[Pose,Pose,Pose,Pose]:
+def decompose_essential_matrix(E: np.ndarray) -> Tuple[Transform]:
     """
         Decompose the essential matrix into possible rotations and translations.
 
@@ -239,31 +180,26 @@ def recover_pose(E: np.ndarray) -> Tuple[Pose,Pose,Pose,Pose]:
             E (np.ndarray, [3, 3]): Essential matrix.
 
         Returns:
-            pose1 (Pose): First possible pose (R1, t).
-            pose2 (Pose): Second possible pose (R1, -t).
-            pose3 (Pose): Third possible pose (R2, t).
-            pose4 (Pose): Fourth possible pose (R2, -t).
-
-        Raises:
-            ValueError: If the determinant of the rotation matrix is not positive.
+            transform1 (Transform): First possible pose (R1, t).
+            transform2 (Transform): Second possible pose (R1, -t).
+            transform3 (Transform): Third possible pose (R2, t).
+            transform4 (Transform): Fourth possible pose (R2, -t).
     """
-    U, _, Vt = np.linalg.svd(E)
-    W = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+    U, _, Vt = svd(E)
+    W = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
+    if determinant(U) < 0: U = -U
+    if determinant(Vt) < 0: Vt = -Vt
+
     R1 = U @ W @ Vt
     R2 = U @ W.T @ Vt
-    t = U[:, 2]
+    t = U[:,2]
 
-    if np.linalg.det(R1) < 0:
-        R1 = -R1
-    if np.linalg.det(R2) < 0:
-        R2 = -R2
+    tf1 = Transform(t, Rotation.from_mat3(R1))
+    tf2 = Transform(-t, Rotation.from_mat3(R1))
+    tf3 = Transform(t, Rotation.from_mat3(R2))
+    tf4 = Transform(-t, Rotation.from_mat3(R2))
 
-    pose1 = Pose(t, Rotation.from_mat3(R1))
-    pose2 = Pose(-t, Rotation.from_mat3(R1))
-    pose3 = Pose(t, Rotation.from_mat3(R2))
-    pose4 = Pose(-t, Rotation.from_mat3(R2))
-
-    return pose1, pose2, pose3, pose4
+    return tf1,tf2,tf3,tf4
 
 def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Camera, cv_flags:Any=None) -> Transform:
     """
@@ -291,21 +227,23 @@ def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Camera, cv_flags:Any=Non
         LOG_ERROR(f"Not enough points to solvePnP. available points must be 4 at least, but got {rays.shape[1]}.")
         return None
 
-    pts_homo = rays / rays[2:3,:] # [xd, yd, 1]
+    pts2d =  dehomo(rays) # [xd, yd, 1]
 
-    ret, rvec, tvec = cv.solvePnP(pts3d,pts_homo,np.eye(3),np.zeros([0., 0., 0., 0., 0.]),flags=cv_flags)
+    ret, rvec, tvec = cv.solvePnP(pts3d.T,pts2d.T,np.eye(3),np.array([0., 0., 0., 0., 0.]))
     if ret:
         return Transform.from_rot_vec_t(rvec,tvec)
-    return None
+    else:
+        LOG_ERROR("Failed to SolvePnP Algorithm.")
+        return None
 
-def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Camera, transform: Transform=None) -> np.ndarray:
+def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Camera, img_tf:Optional[np.ndarray]=None) -> np.ndarray:
     """
         Transition the view from one camera to another with a specified transformation.
 
         Args:
             image (np.ndarray, [H,W] or [H,W,3]): The input image array from the source camera.
-            src_cam (Camera): Source camera object, camera size = [W,H]
-            dst_cam (Camera): Destination camera object, camera size = [out_W,out_H]
+            src_cam (Camera): Source camera instance, camera size = [W,H]
+            dst_cam (Camera): Destination camera instance, camera size = [out_W,out_H]
             transform (Transform): Transform instance applied in normalized coordinates.
 
         Return:
@@ -320,9 +258,9 @@ def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Came
 
     output_rays, dst_valid_mask = dst_cam.convert_to_rays()  # 3 * N
     # Apply inverse transform
-    if transform:
-        inverse_transform = transform.inverse()
-        output_rays = inverse_transform.apply_pts3d(output_rays)  # 3 * N
+    if img_tf is not None:
+        inverse_img_tf = inv(img_tf)
+        output_rays = inverse_img_tf @ output_rays  # 3 * N
 
     # Project ray onto source camera
     input_coords, src_valid_mask  = src_cam.convert_to_pixels(output_rays, out_subpixel=True)  # 2 * N
@@ -337,7 +275,7 @@ def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Came
         # For single-channel images
         output_image = map_coordinates(src_image, [input_y, input_x], order=1, mode='constant').reshape((out_height, out_width))
     mask = logical_and(src_valid_mask,dst_valid_mask).reshape((out_height,out_width))
-    output_image[~mask,0] = 255    
+    output_image[~mask,0] = 0    
 
     return output_image
 
@@ -371,8 +309,10 @@ def find_corresponding_points(image1: np.ndarray, image2: np.ndarray,
         raise ValueError("Unsupported feature type. Choose 'SIFT' or 'ORB'.")
 
     # Find keypoints and descriptors with chosen detector
-    keypoints1, descriptors1 = detector.detectAndCompute(image1, None)
-    keypoints2, descriptors2 = detector.detectAndCompute(image2, None)
+    gray1 = cv.cvtColor(image1, cv.COLOR_BGR2GRAY)
+    gray2 = cv.cvtColor(image2, cv.COLOR_BGR2GRAY)
+    keypoints1, descriptors1 = detector.detectAndCompute(gray1, None)
+    keypoints2, descriptors2 = detector.detectAndCompute(gray2, None)
 
     # Match descriptors between images
     if feature_type == 'SIFT':
@@ -391,264 +331,289 @@ def find_corresponding_points(image1: np.ndarray, image2: np.ndarray,
     matches = sorted(matches, key=lambda x: x.distance)
 
     # Extract location of good matches
-    pts1 = []
-    pts2 = []
-
-    for m in matches[:max_matches]:
-        pts1.append(keypoints1[m.queryIdx].pt)
-        pts2.append(keypoints2[m.trainIdx].pt)
+    pts1 = [keypoints1[m.queryIdx].pt for m in matches[:max_matches]]
+    pts2 = [keypoints2[m.trainIdx].pt for m in matches[:max_matches]]
 
     return pts1, pts2
 
+def triangulate_points(pts1: Union[np.ndarray, List[Tuple[int]]],
+                       pts2: Union[np.ndarray, List[Tuple[int]]],
+                       cam1:Camera, cam2:Camera,
+                       w2c1:Union[Pose,Transform],
+                       w2c2:Union[Pose,Transform]) -> np.ndarray:
+    """
+        Triangulate points from corresponding points between two cameras.
 
-# def triangulate_points(pts1: Union[np.ndarray, List[Tuple[int]]],
-#                        pts2: Union[np.ndarray, List[Tuple[int]]],
-#                        cam1:Camera, cam2:Camera, rel_pose12:Union[Pose,Transform]) -> np.ndarray:
-#     """
-#     Triangulate points using the linear method.
-
-#     Parameters:
-#     - pts1, pts2 (Union[np.ndarray, List[Tuple[int]]]): Corresponding points in each image.
-#     - cam1, cam2 (Camera): Camera objects containing intrinsic parameters.
-#     - rel_pose12 (Union[Pose, Transform]): Relative pose or transformation from the first to the second camera.
-
-#     Returns:
-#     - np.ndarray: Array containing the 3D coordinates of the triangulated points.
-#     """
-#     # Convert points to numpy array if they are given as lists
-#     if isinstance(pts1, list):
-#         pts1 = np.array(pts1)
-#     if isinstance(pts2, list):
-#         pts2 = np.array(pts2)    
-
-
-# class MultiView:
-#     """
-#     Multiview Geometry
-    
-#     Available Contents
-#     Epipolar Line: epipolar_line_test.py
-#     make point clouds: TODO
-#     """
-#     def __init__(self,
-#                 image_path: List[str],
-#                 cameras: List[Camera],
-#                 poses: List[Pose],
-#                 depth_path: Optional[List[str]]=None,
-#                 normal_path: Optional[List[str]]=None
-#                 ) -> None:
-#         assert(len(image_path) == len(cameras) and len(image_path) == len(poses)), "Number of images, camera, and poses must be same."
-#         if depth_path is not None:
-#             assert(len(image_path) == len(depth_path)), "Number of images and these depth must be same."
-#         if normal_path is not None:
-#             assert(len(image_path) == len(normal_path)), "Number of images and these normal must be same."
-            
-
-#         self.image_path = image_path
-#         self.cameras = cameras
-#         self.poses = poses
-#         self.depth_path = depth_path
-#         self.normal_path = normal_path
-#         self.n_views = len(cameras)
-
-#         self.has_depth = True if len(self.depth_path) != 0 else False
-                
-#     @staticmethod
-#     def from_meta_data(
-#         root_path: str,
-#         meta_data:Dict[str,Any]) -> 'MultiView':
-#         image_path = []
-#         cameras = []
-#         poses = []
-#         depth_path = []
-#         normal_path = []
+        Args:
+            pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points
+            cam1, cam2 (Camera): Camera Instance.
+            w2c1 (Union[Pose, Transform]): World to first camera Transform or Pose.
+            w2c2 (Union[Pose, Transform]): World to first camera Transform or Pose.
         
-#         height = meta_data["height"]
-#         width = meta_data["width"]
-        
-#         frames = meta_data["frames"]
-#         for frame in frames:
-#             image_path.append(osp.join(root_path,frame["rgb_path"]))
-#             depth_path.append(osp.join(root_path,frame["mono_depth_path"]))
-#             normal_path.append(osp.join(root_path,frame["mono_normal_path"])) 
-#             poses.append(Pose.from_mat(np.array(frame["camtoworld"]))) 
-#             # create camera
-#             K = frame["intrinsics"]
-#             cam_dict = {}
-#             cam_dict["fx"] = K[0][0]
-#             cam_dict["fy"] = K[1][1]
-#             cam_dict["cx"] = K[0][2]
-#             cam_dict["cy"] = K[1][2]
-#             cam_dict["skew"] = K[0][1]
-#             cam_dict["height"] = height
-#             cam_dict["width"] = width
-#             cam_dict["cam_type"] = meta_data["camera_model"]
-#             cameras.append(Camera.create_cam(cam_dict))
-            
-#         return MultiView(image_path,cameras,poses,
-#                          depth_path,normal_path)   
+        Return:
+            (np.ndarray, [3,N]) : Array containing the 3D coordinates of the triangulated points.
+    """
+    # Convert points to numpy array if they are given as lists
+    if isinstance(pts1, list):
+        pts1 = np.array(pts1).T # [2,N]
+    if isinstance(pts2, list):
+        pts2 = np.array(pts2).T # [2,N]
     
-#     @staticmethod
-#     def from_dict(frame_dict:Dict[str,Any]) -> 'MultiView':
-#         root = frame_dict["root"]
-#         frames = frame_dict["frames"]
-#         image_path = []
-#         depth_path = []
-#         normal_path = []
-#         cameras = []
-#         poses = []
-#         for frame in frames:
-#             cameras.append(Camera.create_cam(frame["cam"]))
-#             poses.append(Pose.from_mat(np.array(frame["camtoworld"])))
-#             image_path.append(osp.join(root,frame["image"]))
-#             if "depth" in frame:
-#                 depth_path.append(osp.join(root,frame["depth"]))
-        
-#         return MultiView(image_path,cameras,poses,depth_path,normal_path)
+    rays1, _ = cam1.convert_to_rays(pts1)
+    rays2, _ = cam2.convert_to_rays(pts2)
 
-#     def fundamental_matrix(self, idx1:int, idx2:int):
-#         ## F = K_1^-1*(t×R)*K_2^-1
-#         ## [R,t]: relative pose from frame1 to frame2
-        
-#         inv_K1 = self.cameras[idx1].inv_K
-#         K2 = self.cameras[idx2].K
-#         E = self.essential_matrix(idx1,idx2)
-#         F = matmul(np.linalg.inv(K2.T) ,E)
-#         F = matmul(F,inv_K1)
-#         return F
-    
-#     def essential_matrix(self, idx1:int, idx2:int):
-#         ## E = [t]×R,  
-#         c1_to_c2 = self.relative_pose(idx1,idx2)
-#         skew_t = c1_to_c2.skew_t()
-#         r_mat = c1_to_c2.rot_mat()
-#         return matmul(skew_t,r_mat)        
-    
-#     def relative_pose(self, idx1:int, idx2:int) -> Pose:
-#         ## [R,t]: relative pose from frame1 to frame2
-#         ## Relative Pose = Pose2 - Pose1
-#         c1tow = self.poses[idx1]
-#         wtoc2 = self.poses[idx2].inverse()
-#         return wtoc2.merge(c1tow)
-    
-#     def choice_points(self, idx1:int, idx2:int, n_points:int) -> List[Tuple[int,int]]:
-#         left_image, right_image = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])  
-#         fig, axs = plt.subplots(1, 2)
-#         axs[0].imshow(left_image)
-#         axs[1].imshow(right_image)
-#         axs[0].set_title(f"Choose {n_points} points on left image")
-#         pts = plt.ginput(n_points)
-#         pts = np.int32(pts)
-#         plt.close(fig)
-#         return pts.tolist()
-    
-#     def draw_epipolar_line(self, idx1:int, idx2:int,
-#                            left_pt2d:List[Tuple[int]]=None):
-#         cam1 = self.cameras[idx1]
-#         cam2 = self.cameras[idx2]
-#         if (cam1.cam_type == cam2.cam_type) and cam1.cam_type == CamType.PINHOLE:
-#             return self._draw_epipolar_line_between_pinholes(idx1,idx2, left_pt2d)
-    
-#     def _draw_epipolar_line_between_pinholes(self, idx1:int, idx2:int,
-#                                               left_pt2d:List[Tuple[int,int]]) -> np.ndarray:
-#         """
-#         Draw Epipolar Line between Pinhole Cameras
-#         Args:
-#             idx1,idx2: left and right camera inices respectively
-#             left_pt2d: (n,2), 2D points in left image
-#             save_path: path to save the result
-#         Return:
-#             Image: (H,2W,3) or (H,2W), float, 
-#         """
-#         assert(len(left_pt2d) > 0), ("To draw epipolar line, 2D points must be needed.")
-#         left, right = read_image(self.image_path[idx1]),read_image(self.image_path[idx2])
-        
-#         F = self.fundamental_matrix(idx1,idx2)
-#         F = convert_numpy(F)
-#         for pt in left_pt2d:
-#             pt_homo = np.array([pt[0], pt[1], 1.])
-#             color = tuple(np.random.randint(0,255,3).tolist())
-#             left = draw_circle(left, pt, 1,color,2)
-#             right = draw_line_by_line(right,tuple((F@pt_homo).tolist()), color, 2)            
-                     
-#         image = concat_images([left,right], vertical=False)
-#         return image        
-    
-#     def save_point_cloud(self, save_path: str):
-        
-#         pts3d = []
-#         colors = []
-        
-#         for i in range(self.n_views):
-#             rays = self.cameras[i].get_rays(norm=False) # [n,3]
-#             origin, direction = self.poses[i].get_origin_direction(rays) # [n,3], [n,3]
-#             depth = read_float(self.depth_path[i]).reshape(-1,1)
-#             if depth is not None:
-#                 pts3d_w = origin + depth * direction            
-#                 pts3d.append(pts3d_w)
-#                 color = read_image(self.image_path[i],as_float=True).reshape(-1,3) # as_float:0~255 -> 0~1.          
-#                 colors.append(color)
-#         pts3d = concat(pts3d, 0)
-#         colors = concat(colors, 0)            
-        
-#         make_point_cloud(pts3d, colors, save_path)
-    
-#     def get_image(self, idx:int) -> np.ndarray:
-#         return read_image(self.image_path[idx])
-    
-#     def get_camera(self, idx:int) -> Camera:
-#         return self.cameras[idx]
+    pts1_norm = dehomo(rays1)
+    pts2_norm = dehomo(rays2) 
 
-#     def __normalize_points(self, pts: Array) -> Tuple[np.ndarray,np.ndarray]:
-#         """
-#         Normalize the points so that the mean is 0 and the average distance is sqrt(2).
-#         """
-            
-#         pts = convert_numpy(pts)
-#         centroid = np.mean(pts, axis=0)
-#         centered_pts = pts - centroid
-#         scale = np.sqrt(2) / np.mean(np.linalg.norm(centered_pts, axis=1))
-#         transform = np.array([[scale, 0, -scale * centroid[0]],
-#                               [0, scale, -scale * centroid[1]],
-#                               [0, 0, 1]])
-#         normalized_points = np.dot(transform, np.concatenate((pts.T, np.ones((1, pts.shape[0])))))
-#         return normalized_points.T, transform
+    P1 = w2c1.mat34()
+    P2 = w2c2.mat34()
+
+    points_4d_hom = cv.triangulatePoints(P1,P2,pts1_norm,pts2_norm)
+
+    points_3d = dehomo(points_4d_hom)
+    return points_3d
+
+def compute_relative_transform_from_points(pts1: Union[np.ndarray, List[Tuple[int]]],
+                               pts2: Union[np.ndarray, List[Tuple[int]]],
+                               cam1: Camera,
+                               cam2: Camera,
+                               use_ransac: bool=False,
+                               threshold:float=1e-2,
+                               max_iterations:int=1000) -> Transform:
+    """
+        Computes the relative transform between two sets of points observed by two cameras.
+
+        Args:
+            pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points
+            cam1, cam2 (Camera): Camera Instance.
+            use_ransac (bool, optional): Flag to use RANSAC for fundamental matrix computation. Defaults to False.
+            threshold (float, optional): RANSAC reprojection threshold. Defaults to 1e-3.
+            max_iterations (int, optional): Maximum number of RANSAC iterations. Defaults to 1000.
+
+        Return:
+            Transform: The computed relative transform between the two camera views.
+
+        Details:
+        - Converts input points to normalized image coordinates to support various camera models.
+        - Uses only the points with positive z components of the rays for the computation.
+    """
     
-#     def recover_pose(self, left_pts: List[Tuple[int,int]],right_pts: List[Tuple[int,int]], K:Array=None) -> Pose:
-#         assert(len(left_pts) >= 3), f"To recover the relative pose, correspondence pairs must be larger than 3, but got {len(left_pts)}"
-#         assert(len(right_pts) >= 3), f"To recover the relative pose, correspondence pairs must be larger than 3, but got {len(right_pts)}"
-#         assert(len(left_pts) == len(right_pts)), "Correspondence pairs must be same."
-        
-#         left_pts = np.array(left_pts)
-#         right_pts = np.array(right_pts)
-        
-#         left_pts_norm, T1 = self.__normalize_points(left_pts)
-#         right_pts_norm, T2 = self.__normalize_points(right_pts)
-        
-#         A = []
-#         for l,r in zip(left_pts_norm,right_pts_norm):
-#             x1, y1 = l 
-#             x2, y2 = r
-#             A.append([-x1, -y1, -1, 0, 0, 0, x2 * x1, x2 * y1, x2])
-#             A.append([0, 0, 0, -x1, -y1, -1, y2 * x1, y2 * y1, y2])
+    # Convert points to numpy array if they are given as lists
+    if isinstance(pts1, list):
+        pts1 = np.array(pts1).T # [2,N]
+    if isinstance(pts2, list):
+        pts2 = np.array(pts2).T # [2,N]
 
-#         A = np.array(A)
-#         # Compute Homography using SVD decomposition 
-#         _, _, Vt = np.linalg.svd(A)
-#         H = Vt[-1].reshape((3, 3))
+    rays1, mask1 = cam1.convert_to_rays(pts1)
+    rays2, mask2 = cam2.convert_to_rays(pts2)
 
-#         # denormalize
-#         H = np.dot(np.linalg.inv(T2), np.dot(H, T1))
+    forward_ray_mask = logical_and(rays1[2,:] > 0, rays2[2,:] > 0) # for verifiying relative pose
+    mask = logical_and(mask1,mask2,forward_ray_mask)
 
-#         # Make the last element 1
-#         H /= H[-1, -1]
+    pts1_norm = dehomo(rays1[:,mask])
+    pts2_norm = dehomo(rays2[:,mask])
+
+    # Since pts1_norm,pts2_norm are normalized points, fundamental matrix(F) is same as essential_matrix  
+    if use_ransac:
+        E,_ = compute_fundamental_matrix_using_ransac(pts1_norm,pts2_norm,threshold,max_iterations)
+    else:
+        E = compute_fundamental_matrix_from_points(pts1_norm, pts2_norm)
+
+    _,R,t,_ = cv.recoverPose(E,pts1_norm.T,pts2_norm.T,np.eye(3))
+
+    return Transform(t,Rotation.from_mat3(R))
+
+def compute_relative_transform(image1: np.ndarray,
+                               image2: np.ndarray,
+                               cam1: Camera,
+                               cam2: Camera,
+                               feature_type: str='ORB',
+                               max_matches: int = 50,
+                               use_ransac: bool=True,
+                               threshold:float=1e-3,
+                               max_iterations:int=1000) -> Transform:
+    """
+        Computes the relative transform between two images.
+
+        Args:
+            image1, image2 (np.ndarray, [H,W] or [H,W,3]): Images
+            cam1, cam2 (Camera): Camera Instance.
+            feature_type (str, optional): Type of feature extractor to use ('SIFT', 'ORB', etc.). Defaults to 'SIFT'.
+            max_matches (int, optional): Maximum number of matching points to use. Defaults to 50.
+            use_ransac (bool, optional): Flag to use RANSAC for fundamental matrix computation. Defaults to False.
+            threshold (float, optional): RANSAC reprojection threshold. Defaults to 1e-3.
+            max_iterations (int, optional): Maximum number of RANSAC iterations. Defaults to 1000.
+
+        Return:
+            Transform: The computed relative transform between the two camera views.
+
+        Details:
+        - Converts input points to normalized image coordinates to support various camera models.
+        - Uses only the points with positive z components of the rays for the computation.
+    """
+    
+    pts1,pts2 = find_corresponding_points(image1,image2,feature_type,max_matches)
+    
+    return compute_relative_transform_from_points(pts1,pts2,cam1,cam2,use_ransac,threshold,max_iterations)
+
+def convert_point_cloud_to_depth(pcd: np.ndarray, cam:Camera, map_type:str='MPI'):
+    """
+        Convert 3D point to depth map of given camera.
+
+        Args:
+            pcd (np.ndarray, [N,3] or [3,N]): 3D Point Cloud
+            cam: (Camera): Camera Instance with [H,W] resolution.
+            map_type:(str): Depth map represntation type (see Details).
+
+        Return:
+            depth_map (np.ndarray, [H,W]): depth map converted from point cloud
         
-#         return H
+        Details:
+        - Available map_type: MPI, MSI, MCI
+        - Multi-Plane Image (MPI): Depth = Z
+        - Multi-Spherical Image (MSI): Depth = sqrt(X^2 + Y^2 + Z^2)
+        - Multi-Cylinder Image (MCI): Depth = sqrt(X^2 + Z^2)
+        - The depth map stores the smallest depth value for each converted pixel coordinate.
+    """
 
+    if map_type.lower() not in ["mpi", "msi", "mci"]:
+        LOG_CRITICAL(f"Unsupported Depth Map Type, {map_type}.")
+        raise ValueError(f"Unsupported Depth Map Type, {map_type}.")
+
+    if pcd.shape[0] != 3: # pcd's shape = [N,3]
+        pcd = swapaxes(pcd,0,1) # convert pcd's shape as [3,N]
+
+    if map_type.lower() == "mpi": # Depth = Z
+        depth = pcd[2,:] 
+    elif map_type.lower() == "msi": # Depth = sqrt(X^2 + Y^2 + Z^2)
+        depth = norm(pcd,dim=0)
+    else: # Depth = sqrt(X^2 + Z^2)
+        depth = sqrt(pcd[0,:]**2 + pcd[2,:]**2)
+    
+    uv, mask = cam.convert_to_pixels(pcd) # [2,N], [N,]
+    
+    # remain valid pixel coords and these depth
+    uv = uv[:,mask]
+    depth = depth[mask]
 
     
-# # if __name__ == '__main__':
+    depth_map = np.full((cam.width*cam.height), np.inf)
+    indices = uv[1,:] * cam.width + uv[0,:]
+    np.minimum.at(depth_map, indices, depth)
+    depth_map[depth_map == np.inf] = 0.
+    depth_map = depth_map.reshape((cam.height,cam.width))
+    return depth_map
+
+def convert_depth_to_point_cloud(depth: np.ndarray, cam: Camera, image: Optional[np.ndarray]=None, map_type: str='MPI',pose:Optional[Union[Pose,Transform]]=None):
+    """
+        Convert depth map to point cloud.
+
+        Args:
+            depth_map (np.ndarray, [H,W]): depth map.
+            cam (Camera): Camera Instance with [H,W] resolution.
+            image (np.ndarray, [H,W,3]): color image. 
+            map_type (str): Depth map representation type (see Details).
+            pose (Pose or Transform): Transform instance.
+
+        Returns:
+            pcd (np.ndarray, [N,3]): 3D Point Cloud
+            colors (np.ndarray, [N,3]): Point Cloud's color if image was given
     
+        Details:
+        - Available map_type: MPI, MSI, MCI
+        - Multi-Plane Image (MPI): Depth = Z
+        - Multi-Spherical Image (MSI): Depth = sqrt(X^2 + Y^2 + Z^2)
+        - Multi-Cylinder Image (MCI): Depth = sqrt(X^2 + Z^2)
+        - Return only valid point cloud (i.e. N <= H*W).
+    """
+    if depth.shape != cam.hw:
+        LOG_CRITICAL(f"Depth map's resolution must be same as camera image size, but got depth's shape={depth.shape}.")
+        raise ValueError(f"Depth map's resolution must be same as camera image size, but got depth's shape={depth.shape}.")
+    if image is not None and image.shape[0:2] != cam.hw:
+        LOG_CRITICAL(f"Image's resolution must be same as camera image size, but got image's shape={image.shape}.")
+        raise ValueError(f"Image's resolution must be same as camera image size, but got image's shape={image.shape}.")
+
+    if cam.cam_type in [CamType.PERSPECTIVE, CamType.OPENCVFISHEYE, CamType.THINPRISM] and map_type != 'MPI':
+        LOG_WARN(f"Camera type {cam.cam_type} typically expects MPI depth map, but got {map_type}.")
+
+    rays, mask = cam.convert_to_rays()
+    depth = depth.reshape(-1,)
+
+    if map_type == 'MPI':
+        Z = rays[2:3,:]
+        mask = logical_and((Z != 0.).reshape(-1,), mask)
+        Z[Z == 0.] = EPSILON
+        rays = rays / Z # set Z = 1
+        pts3d = rays * depth
+    elif map_type == 'MSI':
+        pts3d = rays * depth
+    elif map_type == 'MCI':
+        r = sqrt(rays[0, :]**2 + rays[2, :]**2).reshape(-1, 1)
+        mask = logical_and(mask, (r != 0.).reshape(-1,) )
+        r[r == 0.] = EPSILON
+        pts3d = rays * depth / r
+    else:
+        LOG_CRITICAL(f"Unsupported map_type {map_type}.")
+        raise ValueError(f"Unsupported map_type {map_type}.")
+
+    if pose is not None:
+        if isinstance(pose,Pose): pose = Transform.from_pose(pose)
+        pts3d = pose * pts3d
+
+    pts3d = swapaxes(pts3d,0,1)
+
+    valid_depth_mask = depth > 0.
+
+    mask = logical_and(mask,valid_depth_mask)
+    pts3d = pts3d[mask,:]
+    if image is not None:
+        colors = image.reshape(-1,3)[mask,:]
+        return pts3d, colors
+    return pts3d
+
+def compute_points_for_epipolar_curve(pt_cam1: np.ndarray, cam1: Camera, cam2: Camera, rel_tf: Transform, depth_rng: Tuple[float, float], max_pts: int):
+    """
+        Compute points for the epipolar curve from cam1 to cam2.
+
+        Args:
+            pt_cam1 (np.ndarray, [2,1]): The 2D point in cam1 image space.
+            cam1 (Camera): The first camera object.
+            cam2 (Camera): The second camera object.
+            rel_tf (Transform): The relative transform between cam1 and cam2.
+            depth_rng (Tuple[float, float]): The range of depths to consider.
+            max_pts (int): The maximum number of points to compute.
+
+        Return:
+            points (np.ndarray, [2,N]): List of valid 2D points in cam2 image space.
+    """
+    assert isinstance(depth_rng, tuple) and len(depth_rng) == 2, "depth_rng must be a tuple with two elements."
+    assert pt_cam1.shape == (2, 1), "pt_cam1 must be a 2x1 numpy array."
+    assert max_pts > 0, "max_pts must be greater than 0."
+
+    ray, mask = cam1.convert_to_rays(pt_cam1)
+    if mask.sum() == 0:
+        LOG_ERROR("No valid ray found from the given point in cam1.")
+        return None
+
+    def compute_pixel_in_cam2(ray: np.ndarray, cam2: Camera, rel_tf: Transform, depth: np.ndarray):
+        pt3d = ray * depth
+        pt3d = rel_tf * pt3d
+        return cam2.convert_to_pixels(pt3d, out_subpixel=False)
+        
+    def unique_and_sort_pts2d(pts2d_cam2:np.ndarray,distance:np.ndarray):
+        pts2d_cam2 = np.unique(pts2d_cam2.T,axis=0).T
+        indices = np.lexsort((pts2d_cam2[0],pts2d_cam2[1]))[::-1]
+        distance = distance[indices]
+        pts2d_cam2 = pts2d_cam2[:,indices]
+        return pts2d_cam2,distance
+
+    distance = np.linspace(depth_rng[0],depth_rng[1],max_pts+1)
+    pts2d_cam2, mask = compute_pixel_in_cam2(ray,cam2,rel_tf,distance)
+
+    pts2d_cam2 = pts2d_cam2[:,mask]
+    distance = distance[mask]
     
-    
-    
+    pts2d_cam2,distance = unique_and_sort_pts2d(pts2d_cam2,distance)
+
+
+    return pts2d_cam2

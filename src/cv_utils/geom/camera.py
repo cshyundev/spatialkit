@@ -7,7 +7,7 @@ It includes the Camera abstract class, which serves as a base class for specific
 and defines essential methods like projection and unprojection.
 
 Camera Types:
-- PRESPECTIVE: Perspective Camera Type
+- PERSPECTIVE: Perspective Camera Type
 - OPENCV: OpenCV Fisheye Camera Type
 - THINPRISM: Thin Prism Fisheye Camera Type
 - OMNIDIRECT: Omnidirectional FIsheye Camera Type
@@ -23,7 +23,7 @@ License: MIT LICENSE
 """
 
 import numpy as np
-from ..common.constant import PI
+from ..common.constant import PI,NORM_PIXEL_THRESHOLD
 from ..ops.uops import *
 from ..ops.umath import *
 from ..common.logger import *
@@ -32,7 +32,7 @@ from typing import *
 import cv2 as cv
 
 class CamType(Enum):
-    PRESPECTIVE = ("PRESPECTIVE", "Perspective Camera Type")
+    PERSPECTIVE = ("PERSPECTIVE", "Perspective Camera Type")
     OPENCVFISHEYE = ("OPENCVFISHEYE", "Open Fisheye Camera Type")
     THINPRISM = ("THINPRISIM", "Thin Prism Fisheye Camera Type")
     OMNIDIRECT = ("OMNIDIRECT", "Omnidirectional Camera Type")
@@ -42,8 +42,8 @@ class CamType(Enum):
     
     @staticmethod
     def from_string(type_str: str)-> 'CamType':
-        if type_str == 'PRESPECTIVE':
-            return CamType.PRESPECTIVE
+        if type_str == 'PERSPECTIVE':
+            return CamType.PERSPECTIVE
         elif type_str == 'OPENCV_FISHEYE':
             return CamType.OPENCVFISHEYE
         elif type_str == 'EQUIRECT':
@@ -101,15 +101,16 @@ class Camera:
         mask = convert_numpy(mask).reshape(-1,)
         self._mask = logical_and(self._mask, mask)
 
-    def convert_to_rays(self, uv:ArrayLike) -> Tuple[ArrayLike,ArrayLike]:
+    def convert_to_rays(self, uv:ArrayLike,z_fixed:Optional[bool]=False) -> Tuple[ArrayLike,ArrayLike]:
         """
             Converts pixel coordinates into unit vector camera rays.
 
-            Arg:
-                uv (ArrayLike, [2,N]): ArrayLike containing pixel coordinates.
+            Args:
+                uv (ArrayLike, [2,N]): 2D image pixel coordinates.
+                z_fixed: (bool): z_fixed (bool): If True, the rays have their Z-component fixed at 1.
             
             Returns:
-                rays (ArrayLike, [3, N]): ArrayLike containing unit vector camera rays.
+                rays (ArrayLike, [3, N]): unit vector camera rays.
                 mask (ArrayLike, [N,]): Boolean mask indicating which rays are valid.
             
             Details:
@@ -225,8 +226,8 @@ class Camera:
     def load_from_cam_dict(cam_dict:Dict[str,Any]):
         cam_type = CamType.from_string(cam_dict["cam_type"])
 
-        if cam_type == CamType.PRESPECTIVE:
-            return PerpectiveCamera(cam_dict)
+        if cam_type == CamType.PERSPECTIVE:
+            return PerspectiveCamera(cam_dict)
         elif cam_type == CamType.OPENCVFISHEYE:
             return OpenCVFisheyeCamera(cam_dict)
         elif cam_type == CamType.THINPRISM:
@@ -359,7 +360,7 @@ class RadialCamera(Camera):
         for _ in range(self.max_iter):
             rx, ry, rx_x, rx_y, ry_x, ry_y \
                 = self._compute_residual_jacobian(xu, yu, xd, yd)
-            if sqrt(rx**2 + ry**2).max() < 1e-4: break
+            if sqrt(rx**2 + ry**2).max() < NORM_PIXEL_THRESHOLD: break
             Det = ry_x * rx_y - rx_x * ry_y
             x_numerator,y_numerator = ry_y*rx-rx_y*ry, rx_x*ry-ry_x*rx
             step_x = where(abs(Det) > self.err_thr, x_numerator / Det, zeros_like(Det))
@@ -380,7 +381,7 @@ class RadialCamera(Camera):
         fov_mask = theta <= max_theta
         return fov_mask    
 
-    def convert_to_rays(self,uv:Optional[ArrayLike]=None) -> Tuple[ArrayLike,ArrayLike]:
+    def convert_to_rays(self,uv:Optional[ArrayLike]=None, z_fixed:Optional[bool]=False) -> Tuple[ArrayLike,ArrayLike]:
         if uv is None:
             uv = self.make_pixel_grid() # (2,HW)
             mask = convert_array(self._mask,uv)
@@ -392,13 +393,19 @@ class RadialCamera(Camera):
             x,y = self._undistort(x,y)
         z = ones_like(x)
         rays = concat([x,y,z], 0) # (3,HW)
-        rays = normalize(rays,dim=0)
+        if z_fixed is False:
+            rays = normalize(rays,dim=0)
         return rays, mask
     
     def convert_to_pixels(self, rays: ArrayLike, out_subpixel:Optional[bool]=False) -> Tuple[ArrayLike,ArrayLike]:
         X = rays[0:1,:]
         Y = rays[1:2,:]
         Z = rays[2:3,:]
+
+        invalid_depth = (Z == 0.).reshape(-1,)
+
+        Z[:,invalid_depth] = EPSILON
+
         x,y = X / Z, Y / Z
         if self.has_distortion(): x,y = self._distort(x,y)
         u,v = self._to_image_plane(x,y)
@@ -406,6 +413,7 @@ class RadialCamera(Camera):
 
         uv = uv if out_subpixel else as_int(uv,n=32) # (2,N)
         mask = self._extract_mask(uv)
+        mask = logical_and(mask,logical_not(invalid_depth))
         return uv, mask
 
     def distort_pixel(self, uv:ArrayLike, out_subpixel:Optional[bool]=False) -> ArrayLike:
@@ -427,6 +435,7 @@ class RadialCamera(Camera):
     def undistort_image(self, image:np.ndarray) -> np.ndarray:
         if self.hw != image.shape[0:2]:
             LOG_CRITICAL("Image's resolution must be same as camera's resolution.")
+            raise ValueError
 
         if self.has_distortion() is False:
             LOG_WARN("There is no distortion, thus the output image unchanged.")
@@ -439,6 +448,7 @@ class RadialCamera(Camera):
     def distort_image(self, image:np.ndarray) -> np.ndarray:
         if self.hw != image.shape[0:2]:
             LOG_CRITICAL("Image's resolution must be same as camera's resolution.")
+            raise ValueError
 
         if self.has_distortion() is False:
             LOG_WARN("There is no distortion, thus the output image unchanged.")
@@ -449,7 +459,7 @@ class RadialCamera(Camera):
         return output_image
 
 # Simple Radial Camera Model or small distortion
-class PerpectiveCamera(RadialCamera):
+class PerspectiveCamera(RadialCamera):
     """
         Perpective Camera Model.
 
@@ -465,11 +475,11 @@ class PerpectiveCamera(RadialCamera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
-        super(PerpectiveCamera, self).__init__(cam_dict)
-        self.cam_type = CamType.PRESPECTIVE
+        super(PerspectiveCamera, self).__init__(cam_dict)
+        self.cam_type = CamType.PERSPECTIVE
         self.radial_params = cam_dict.get('radial', [0.,0.,0.])
         self.tangential_params = cam_dict.get('tangential',[0.,0.])
-        self.err_thr: float = 1e-4
+        self.err_thr: float = NORM_PIXEL_THRESHOLD
         self.max_iter:int=5
     
     @property
@@ -478,9 +488,9 @@ class PerpectiveCamera(RadialCamera):
         return np.array(_dist_coeffs)
     
     @staticmethod
-    def from_K(K: List[List[float]], image_size:List[int], dist_coeffs: List[float]=None) -> 'PerpectiveCamera':
+    def from_K(K: List[List[float]], image_size:List[int], dist_coeffs: Optional[List[float]]=None) -> 'PerspectiveCamera':
         """
-            Static method to create a PerpectiveCamera instance from intrinsic matrix and distortion coefficients.
+            Static method to create a PerspectiveCamera instance from intrinsic matrix and distortion coefficients.
 
             Args:
                 K (List[List[float]]): Intrinsic matrix parameters as a list 3*3 format.
@@ -488,7 +498,7 @@ class PerpectiveCamera(RadialCamera):
                 dist_coeffs (List[float]): Distortion coefficients as a list [k1, k2, p1, p2, k3].
 
             Return:
-                PerpectiveCamera: An instance of PerpectiveCamera with given parameters.
+                PerspectiveCamera: An instance of PerspectiveCamera with given parameters.
         """
 
         cam_dict = {
@@ -507,19 +517,19 @@ class PerpectiveCamera(RadialCamera):
             cam_dict["radial"] = [0.,0.,0.]
             cam_dict["tangential"] = [0.,0.]
 
-        return PerpectiveCamera(cam_dict)
+        return PerspectiveCamera(cam_dict)
     
     @staticmethod
     def from_fov(image_size:List[int], fov:Union[List[float],float]):
         """
-            Static method to create a PerpectiveCamera instance from image resolution and field of view.
+            Static method to create a PerspectiveCamera instance from image resolution and field of view.
 
             Args:
                 image_size (List[int]): Image resolution as a list [width, height].
                 fov(Union[List[float],float]): Field of view in degrees as a list [fov_x, fov_y] or width field of view.
             
             Return:
-                PerpectiveCamera: An instance of PerpectiveCamera with calculated parameters.
+                PerspectiveCamera: An instance of PerspectiveCamera with calculated parameters.
         """
         width,height = image_size
         if type(fov) == float:
@@ -546,7 +556,7 @@ class PerpectiveCamera(RadialCamera):
             'radial': radial_params,
             'tangential': tangential_params
         }
-        return PerpectiveCamera(cam_dict)
+        return PerspectiveCamera(cam_dict)
 
     def _distort(self, x: ArrayLike, y: ArrayLike) -> Tuple[ArrayLike,ArrayLike] :
         """
@@ -650,7 +660,7 @@ class OpenCVFisheyeCamera(RadialCamera):
         super(OpenCVFisheyeCamera, self).__init__(cam_dict)      
         self.cam_type = CamType.OPENCVFISHEYE
         self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
-        self.err_thr: float = 1e-4
+        self.err_thr: float = NORM_PIXEL_THRESHOLD
         self.max_iter:int=20
       
     @property
@@ -772,7 +782,7 @@ class ThinPrismFisheyeCamera(RadialCamera):
         self.radial_params = cam_dict['radial'] # k1,k2,k3,k4
         self.tangential_params = cam_dict['tangential'] # p1,p2
         self.prism_params = cam_dict['prism'] # sx1,sy1
-        self.err_thr: float = 1e-4
+        self.err_thr: float = NORM_PIXEL_THRESHOLD
         self.max_iter:int=20
 
     @property
@@ -1081,19 +1091,19 @@ class DoubleSphereCamera(Camera):
 
     def convert_to_pixels(self, rays: ArrayLike, out_subpixel:Optional[bool] = False) -> Tuple[ArrayLike,ArrayLike]:
         rays = normalize(rays,dim=0)
-        x = rays[0:1, :]
-        y = rays[1:2, :]
-        z = rays[2:3, :]
+        X = rays[0:1, :]
+        Y = rays[1:2, :]
+        Z = rays[2:3, :]
 
-        x2, y2, z2 = x**2, y**2, z**2
-        d1 = sqrt(x2 + y2 + z2)
+        X2, Y2, Z2 = X**2, Y**2, Z**2
+        d1 = sqrt(X2 + Y2 + Z2)
 
-        xidz = self.xi * d1 + z
-        d2 = sqrt(x2 + y2 + xidz**2)
+        xidz = self.xi * d1 + Z
+        d2 = sqrt(X2 + Y2 + xidz**2)
         
         denom = self.alpha * d2 + (1. - self.alpha) * xidz
-        u = self.fx * x / denom + self.cx
-        v = self.fy * y / denom + self.cy
+        u = self.fx * X / denom + self.cx
+        v = self.fy * Y / denom + self.cy
         uv = concat([u,v], dim=0)
 
         # compute valid area
@@ -1102,9 +1112,9 @@ class DoubleSphereCamera(Camera):
         else:
             w1 = (1. - self.alpha) / self.alpha
         w2 = w1 + self.xi / sqrt(2*w1*self.xi + self.xi **2 + 1.)
-        valid_mask:ArrayLike = z > -w2 * d1
+        valid_mask:ArrayLike = Z > -w2 * d1
 
-        fov_mask = self._compute_fov_mask(z)
+        fov_mask = self._compute_fov_mask(Z)
         mask = self._extract_mask(uv)
         mask = logical_and(fov_mask.reshape(-1,), valid_mask.reshape(-1,), mask)
         uv = uv if out_subpixel else as_int(uv,n=32)

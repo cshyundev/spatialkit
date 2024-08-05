@@ -21,7 +21,7 @@ License: MIT LICENSE
 
 from ..ops.uops import *
 from ..ops.umath import *
-from ..common.constant import PI
+from ..common.constant import PI, ROTATION_SO3_THRESHOLD
 from enum import Enum
 
 
@@ -58,7 +58,7 @@ def is_SO3(x: ArrayLike) -> bool:
     shape = x.shape
     if shape != (3,3): return False # invalid shape
     
-    return allclose(transpose2d(x)*x, eye(3,x)) and isclose(determinant(x), 1.)
+    return allclose(dot(transpose2d(x),x),eye(3,x),atol=ROTATION_SO3_THRESHOLD) and isclose(determinant(x), 1.)
     
 def is_so3(x: ArrayLike) -> bool:
     """
@@ -66,7 +66,7 @@ def is_so3(x: ArrayLike) -> bool:
         1. The shape of array is (3,)
     """
     shape = x.shape
-    if shape != (3,): return False # invalid shape
+    return shape == (3,)
 
 def is_quat(x: ArrayLike) -> bool:
     """
@@ -85,6 +85,7 @@ def is_rpy(x: ArrayLike) -> bool:
     """
     shape = x.shape
     if shape != (3,): return False # invalid shape
+    return True
 
 def so3_to_SO3(so3: ArrayLike) -> ArrayLike:
     """
@@ -259,7 +260,7 @@ def SO3_to_rpy(SO3: ArrayLike) -> ArrayLike:
             pitch = -PI / 2
             roll = -yaw + arctan2(-m01, -m02)
 
-    return convert_array([roll, pitch, yaw], SO3)
+    return convert_array(concat([roll, pitch, yaw],0), SO3)
 
 class Rotation:
     """
@@ -278,20 +279,27 @@ class Rotation:
         
         if rot_type == RotType.SO3:
             if is_SO3(data) is False: 
-                raise Exception(f'Invalid Shape Error. SO3 must be (n,3,3) or (3,3), but got {data.shape}')
+                LOG_CRITICAL('Input does not satisfy the properties of SO3.')
+                self.data = None
             else: self.data = data
         elif rot_type == RotType.so3:
             if is_so3(data) is False:
-                raise Exception(f'Invalid Shape Error. so3 must be (n,3) or (3), but got {data.shape}')
-            self.data = so3_to_SO3(data) 
+                LOG_CRITICAL('Input does not satisfy the properties of so3.')
+                self.data = None
+            else: self.data = so3_to_SO3(data) 
         elif rot_type == RotType.QUAT_XYZW or rot_type == RotType.QUAT_WXYZ:
             if is_quat(data) is False:
-                raise Exception(f'Invalid Shape Error. Quaternion must be (n,4) or (4), but got {data.shape}')
-            self.data = quat_to_SO3(data, rot_type==RotType.QUAT_XYZW)        
+                LOG_CRITICAL('Input does not satisfy the properties of quaternion.')
+                self.data = None
+            else: self.data = quat_to_SO3(data, rot_type==RotType.QUAT_XYZW)        
         elif rot_type == RotType.RPY:
             if is_rpy(data) is False:
-                raise Exception(f'Invalid Shape Error. RPY must be (3,), but got {data.shape}')
-            self.data = rpy_to_SO3(data)
+                LOG_CRITICAL('Input does not satisfy the properties of roll-pitch-yaw.')
+                self.data = None
+            else: self.data = rpy_to_SO3(data)
+        
+        if self.data is None:
+            raise ValueError("Input does not satisfy the properties of Rotation representation.")
         self.data = convert_numpy(self.data)
 
     # constructor
@@ -320,6 +328,9 @@ class Rotation:
     def quat(self) -> np.ndarray:
         return SO3_to_quat(self.data)
     
+    def rpy(self) -> np.ndarray:
+        return SO3_to_rpy(self.data)
+
     def apply_pts3d(self, pts3d: ArrayLike) -> ArrayLike:
         ## R*pts3d: [3,3] * [3,n]
         assert pts3d.shape[0] == 3, f"Invalid Shape. pts3d's shape should be (3,n), but got {str(pts3d.shape)}."

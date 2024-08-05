@@ -33,7 +33,7 @@ class Transform:
         assert is_array(t), 'Translation must be an array type (Tensor or Numpy).'
         assert t.size == 3, 'Size of translation must be 3.'
 
-        if t.shape == (3,): t = t.reshape(1, 3)
+        t = t.reshape(1,3)
         
         self.t: ArrayLike = t
         self.rot: Rotation = rot
@@ -52,9 +52,9 @@ class Transform:
         """
         assert is_array(rot_vec), 'Rotation vector must be ArrayLike type (Tensor or Numpy)'
         assert is_array(t), 'Translation vector must be ArrayLike type (Tensor or Numpy)'
-        assert rot_vec.shape == (3,), 'Invalid Shape. Rotation vector must be (3,)'
-        assert t.shape == (3,), 'Invalid Shape. Translation vector must be (3,)'
-        rot = Rotation.from_so3(rot_vec)
+        assert rot_vec.size == 3, 'Invalid Shape. Rotation vector must be 3 size'
+        assert t.size == 3, 'Invalid Shape. Translation vector must be 3 size'
+        rot = Rotation.from_so3(rot_vec.reshape(-1,))
         return Transform(t, rot)
 
     @staticmethod
@@ -72,21 +72,9 @@ class Transform:
         assert mat4.shape == (4, 4) or mat4.shape == (3, 4), 'Invalid Shape. The shape of mat4 must be (4,4) or (3,4)'
         return Transform(mat4[:3, 3], Rotation.from_mat3(mat4[:3, :3]))
     
-    @staticmethod
-    def from_dict(dict: dict) -> 'Transform':
-        """
-            Create a Transform from a dictionary containing a transformation matrix.
-            
-            Args:
-                dict: Dictionary containing 'camtoworld' key with transformation matrix
-            
-            Return:
-                Transform: Transform instance
-        """
-        assert 'camtoworld' in dict, "No Value Error. There is no Cam to World Transform in Dict."
-        mat = np.array(dict['camtoworld'])
-        return Transform.from_mat(mat)
-    
+    def from_pose(pose: Pose) -> 'Transform':
+        return Transform(pose.t,Rotation.from_mat3(pose.rot_mat())) 
+
     def rot_mat(self) -> np.ndarray:
         """
         Get the rotation matrix of the transform.
@@ -103,7 +91,7 @@ class Transform:
             Return:
                 tf_mat (np.ndarray, [3,4]): Transformation matrix
         """
-        return concat([self.rot_mat(), self.t.T], dim=1)
+        return concat([self.rot_mat(), transpose2d(self.t)], dim=1)
     
     def mat44(self) -> np.ndarray:
         """
@@ -114,8 +102,6 @@ class Transform:
         """
         mat34 = self.mat34()
         last = np.array([0., 0., 0., 1.]).reshape(1, 4)
-        if is_tensor(mat34):
-            last = convert_tensor(last, mat34)
         return concat([mat34, last], dim=0)
     
     def rot_vec_t(self) -> Tuple[np.ndarray,np.ndarray]:
@@ -240,7 +226,7 @@ class Transform:
             t_new = self.rot.apply_pts3d(other.t) + self.t
             r_new = self.rot * other.rot
             return Pose(t_new, r_new)
-        elif isinstance(other,ArrayLike):
+        elif is_array(other):
             return self.apply_pts3d(other)
         else:
             raise ValueError("Multiplication only supported with Transform, Pose or 3D points.")
