@@ -1149,6 +1149,15 @@ class EquirectangularCamera(Camera):
         self.phi_scale = deg2rad(self.max_phi_deg - self.min_phi_deg)
         self.phi_offset = deg2rad((self.max_phi_deg + self.min_phi_deg)*0.5)
 
+    @staticmethod
+    def from_image_size(image_size:Tuple[int,int]) -> 'EquirectangularCamera':
+        cam_dict = {
+            "image_size": image_size,
+            "min_phi_deg": -90.,
+            "max_phi_deg": 90.
+        }
+        return EquirectangularCamera(cam_dict)
+
     def export_cam_dict(self) -> Dict[str,Any]:
         cam_dict = super().export_cam_dict()
         cam_dict["min_phi_deg"] = self.min_phi_deg

@@ -132,4 +132,5 @@ def visualize_geometries(geometries: List[O3dGeometry], window_name: str = "Open
         geometries (List[o3d.geometry.Geometry]): List of geometries to visualize.
         window_name (str): The window name for visualization. Defaults to "Open3D".
     """
+    if isinstance(geometries,list) is False: geometries = [geometries] 
     o3d.visualization.draw_geometries(geometries, window_name=window_name)
