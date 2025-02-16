@@ -337,7 +337,6 @@ class Rotation:
         mat = self.mat()
         if is_tensor(pts3d): mat = convert_tensor(mat,pts3d)        
         pts3d = matmul(mat,pts3d) # [3,3] * [3,n] = [3,n]
-        # pts3d = transpose2d(pts3d).reshape(-1,3) # [n,3]
         return pts3d # [3,n]
     
     def inverse_mat(self) -> ArrayLike:

@@ -31,7 +31,7 @@ def main(unused_args):
         3. Show the result.
     """
 
-    scannet_datamanager = mvs.ScannetV1Manager("/home/sehyun/datasets/scans/scene0000_00/outputs")
+    scannet_datamanager = mvs.ScannetV1Manager("")
 
     id1 = 0
     id2 = 150

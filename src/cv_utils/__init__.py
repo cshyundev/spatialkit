@@ -6,4 +6,5 @@ from .utils import io, point_selector, vis
 from .common.logger import LOG_CRITICAL, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WARN 
 from .common.constant import *
 from .externals.o3d import o3dcomp, o3dutils
-from .sol import mvs
+from .sol import mvs, marker
+from .sol.marker.marker import FiducialMarkerType

@@ -38,10 +38,10 @@ from typing import *
 ArrayLike = Union[ndarray, Tensor] # Unified ArrayType
 
 def is_tensor(x: ArrayLike) -> bool:
-    return type(x) == Tensor
+    return isinstance(x,Tensor)
 
 def is_numpy(x: ArrayLike) -> bool:
-    return type(x) == ndarray
+    return isinstance(x,ndarray) or isinstance(x,np.generic)
 
 def is_array(x: Any) -> bool:
     return is_tensor(x) or is_numpy(x)

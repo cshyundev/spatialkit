@@ -128,7 +128,7 @@ def compute_fundamental_matrix_using_ransac(pts1: Optional[Union[np.ndarray, Lis
         Compute the fundamental matrix given point correspondences using the RANSAC algorithm.
 
         Args:
-            pts1,pts2 (Union[np.ndarray, List[Tuple[int, int]]], [N, 2]): Corresponding points in the images respectively.
+            pts1,pts2 (Union[np.ndarray, List[Tuple[int, int]]], [2,N] or [N, 2]): Corresponding points in the images respectively.
             threshold (float, optional): Distance threshold to determine inliers. Defaults to 1e-3.
             max_iterations (int, optional): Maximum number of RANSAC iterations. Defaults to 1000.
 
@@ -205,8 +205,8 @@ def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Camera, cv_flags:Any=Non
     """
        Computes the camera pose using the Perspective-n-Point (PnP) problem solution.
        Args:
-            pts2d (np.ndarray, [N,2]): 2D image points.
-            pts3d (np.ndarray, [N,3]): Corresponding 3D scene points.
+            pts2d (np.ndarray, [2,N]): 2D image points.
+            pts3d (np.ndarray, [3,N]): Corresponding 3D scene points.
             cam (Camera): Camera instance which can be one of available models.
             cv_flags (Any, optional): Additional options for solving PnP.
 
@@ -217,7 +217,7 @@ def solve_pnp(pts2d: np.ndarray, pts3d: np.ndarray, cam:Camera, cv_flags:Any=Non
             AssertionError: If the camera type is not supported.
     """
     cam_type = cam.cam_type
-    unavailable_cam_types = [ ]
+    unavailable_cam_types = []
     assert(cam_type  not in unavailable_cam_types), f"Unavailable Camera Type: {cam_type.name}"
 
     rays, mask = cam.convert_to_rays(pts2d) # 2 * N
@@ -275,7 +275,7 @@ def transition_camera_view(src_image: np.ndarray, src_cam: Camera, dst_cam: Came
         # For single-channel images
         output_image = map_coordinates(src_image, [input_y, input_x], order=1, mode='constant').reshape((out_height, out_width))
     mask = logical_and(src_valid_mask,dst_valid_mask).reshape((out_height,out_width))
-    output_image[~mask,0] = 0    
+    output_image[~mask] = 0    
 
     return output_image
 
@@ -614,6 +614,5 @@ def compute_points_for_epipolar_curve(pt_cam1: np.ndarray, cam1: Camera, cam2: C
     distance = distance[mask]
     
     pts2d_cam2,distance = unique_and_sort_pts2d(pts2d_cam2,distance)
-
 
     return pts2d_cam2

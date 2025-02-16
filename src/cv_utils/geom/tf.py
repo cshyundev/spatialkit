@@ -14,6 +14,7 @@ import numpy as np
 from .rotation import Rotation, slerp
 from .pose import Pose
 from ..ops.uops import *
+from ..ops.uops import ArrayLike
 from ..ops.umath import *
 
 
@@ -224,7 +225,7 @@ class Transform:
             return self.merge(other)
         elif isinstance(other, Pose):
             t_new = self.rot.apply_pts3d(other.t) + self.t
-            r_new = self.rot * other.rot
+            r_new = self.rot * other._rot
             return Pose(t_new, r_new)
         elif is_array(other):
             return self.apply_pts3d(other)

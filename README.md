@@ -1,7 +1,7 @@
 # cv_utils
 
-**현재 버전:** 0.1.0-alpha  
-**최근 업데이트:** 2024년 6월 1일  
+**현재 버전:** 0.2.1-alpha  
+**최근 업데이트:** 2025년  2월 16일  
 **상태:** 개발 중 - 이 버전은 아직 개발 중이며 버그가 포함되어 있을 수 있다.
 
 ## 라이선스
@@ -62,19 +62,3 @@
     pip install -e .
     ```
 
-## 제공하는 기능 및 테스트
-
-### 1. 3D Pose 검증
-에피폴라 라인(Epipolar line)을 이용해 MVS 데이터셋의 3D 포즈의 정확도를 검증한다.\
-[3D Pose 검증 테스트 사용법](docs/tests/3D_pose_verification.md)
-
-### 2. 카메라 캘리브레이션 정확도 테스트 (개발 예정)
-카메라 캘리브레이션 결과를 재투영 오차(reprojection error)와 왜곡 보정을 통해 정량적, 정석적으로 평가한다.\
-[캘리브레이션 테스트 사용법](docs/tests/homography_transformation.md)
-
-### 3. 이미지 왜곡 보정 변환
-카메라로 촬영된 이미지의 왜곡을 보정후 결과를 저장한다.\
-[이미지 왜곡 보정 테스트 사용법](docs/tests/image_distortion_correction.md)
-
-### 4. Fiducial Marker 인식률 및 Pose 정확도 테스트 (개발 예정)
-Fiducial Marker를 인식하고 인식 결과의 Pose의 정확성을 평가한다.

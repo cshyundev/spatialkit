@@ -107,7 +107,7 @@ class Camera:
 
             Args:
                 uv (ArrayLike, [2,N]): 2D image pixel coordinates.
-                z_fixed: (bool): z_fixed (bool): If True, the rays have their Z-component fixed at 1.
+                z_fixed (bool): If True, the rays have their Z-component fixed at 1.
             
             Returns:
                 rays (ArrayLike, [3, N]): unit vector camera rays.

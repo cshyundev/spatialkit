@@ -7,7 +7,7 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-from cv_utils.core.ops.uops import *
+from cv_utils.ops.uops import *
 
 
 class TestHybridOperations(unittest.TestCase):

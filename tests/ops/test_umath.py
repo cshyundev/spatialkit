@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import unittest
-from cv_utils.core.ops.umath import *
+from cv_utils.ops.umath import *
 
 class TestHybridMath(unittest.TestCase):
     

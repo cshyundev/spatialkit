@@ -1,13 +1,13 @@
 # 프로젝트 아키텍처 및 의존성 문서
 
-**최종 수정 날짜:** 2024년 7월 17일  
-**버전:** v0.2.0
+**최종 수정 날짜:** 2025년 2월 16일  
+**버전:** v0.2.1
 
 이 문서는 프로젝트의 아키텍처 구조와 각 패키지의 역할 및 의존성에 대해 설명한다. 이 정보는 프로젝트의 설계 의도를 이해하고, 각 구성요소 간의 상호작용을 파악하는 데 도움을 준다.
 
 ## 아키텍처 개요
 
-프로젝트는 다수의 주요 패키지로 구성되어 있으며, 각 패키지는 독립적인 기능을 수행하고 필요에 따라 다른 패키지와 상호작용한다. 아키텍처는 주로 `common`, `ops`, `geom`, `utils`, `externals`, 그리고 `sol`의 주요 구성 요소로 나뉜다.
+프로젝트는 다수의 주요 패키지로 구성되어 있으며, 각 패키지는 독립적인 기능을 수행하고 필요에 따라 다른 패키지와 상호작용한다. 아키텍처는 주로 `common`, `ops`, `geom`, `utils`, `externals`, 그리고 `sol`의 주요 구성 요소로 나뉜다. 
 
 
 ```text
@@ -38,17 +38,15 @@ cv_utils/
 |      │   ├── point_selector.py        # Point Selector Class
 |      │   ├── vis.py                   # imgage utilites for visualization
 |      │   ├── io.py                    # File Utilities
-|      │   └── metrics.py               # Metric functions
+|      │   └── metrics.py (TBD)         # Metric functions
 |      │
 |      ├── externals/ # Package for External Library
-|      │   └── o3d/
-|      │      ├── __init__.py
-|      │      └── o3d_utils.py          # Mesh or Point Cloud operations(TBD)
+|      │   └── o3d
 |      │
-|      └── sol/  # Package for specific tasks (TBD)
+|      └── sol/  # Package for specific task
 |           ├── __init__.py
-|           ├── marker.py               # Classes related to Fiducial Marker
-|           └── mvs.py                  # Modules to Multiview Stereo 
+|           ├── marker               # Classes related to Fiducial Marker
+|           └── mvs                  # Modules to Multiview Stereo 
 |
 ├── README.md
 ├── LICENSE
@@ -88,12 +86,12 @@ cv_utils/
 - **metrics.py**: 다양한 메트릭을 계산하여 성능 평가에 사용한다.
 
 
-### Externals (TBD)
+### Externals
 `external` 패키지는 외부 라이브러리와의 통합을 관리한다.
 - **o3d**: Open3D 라이브러리를 이용한 메시 연산을 제공한다.
 
 
-### Solutions (TBD)
+### Solutions
 `sol` 패키지는 특정 애플리케이션 또는 작업을 위해 다른 패키지들의 기능을 활용하여 구현된 기능을 포함한다.
 - **marker.py**: Fiducial Marker와 관련된 기능을 제공한다.
 - **mvs.py**: Multi View Stereo 및 3D 복원과 관련된 기능을 제공한다.
