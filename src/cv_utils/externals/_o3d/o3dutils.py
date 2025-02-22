@@ -1,9 +1,35 @@
-from .common import *
-import numpy as np
-from typing import Optional, List
-import open3d as o3d
+"""
+Module Name: o3dutils.py
 
-def create_point_cloud(pt3d: np.ndarray, colors: Optional[np.ndarray] = None) -> O3dPCD:
+Description:
+This module provides utility functions for creating, saving, loading, and visualizing
+3D geometries using Open3D. It includes functions to create point clouds and meshes
+from arrays, save and load these geometries from files, and visualize them in a window.
+
+Main Functions:
+- create_point_cloud: Create a point cloud from 3D points and optional colors.
+- create_mesh: Create a mesh from vertices, triangles, and optional vertex colors.
+- create_mesh_from_pcd: Generate a mesh from a point cloud using the Ball Pivoting Algorithm.
+- save_mesh: Save a mesh to a specified file path.
+- save_pcd: Save a point cloud to a specified file path.
+- load_mesh: Load a mesh from a specified file path.
+- load_pcd: Load a point cloud from a specified file path.
+- visualize_geometries: Visualize a list of geometries in a single window.
+
+Author: Sehyun Cha
+Email: cshyundev@gmail.com
+Version: 0.2.1
+
+License: MIT License
+"""
+
+from typing import Optional, List, Any
+import numpy as np
+import open3d as o3d
+from .common import O3dPCD, O3dTriMesh
+
+
+def create_point_cloud(pt3d: np.ndarray, colors: Optional[np.ndarray] = None) -> Any:
     """
     Create a point cloud from 3D points.
 
@@ -18,12 +44,16 @@ def create_point_cloud(pt3d: np.ndarray, colors: Optional[np.ndarray] = None) ->
     pcd.points = o3d.utility.Vector3dVector(pt3d)
     if colors is not None:
         if colors.dtype == np.uint8:
-            colors = colors.astype(np.float64) / 255.
+            colors = colors.astype(np.float64) / 255.0
         pcd.colors = o3d.utility.Vector3dVector(colors)
     return pcd
 
-def create_mesh(vertices: np.ndarray, triangles: np.ndarray, vertex_colors: Optional[np.ndarray]=None) \
-    -> O3dTriMesh:
+
+def create_mesh(
+    vertices: np.ndarray,
+    triangles: np.ndarray,
+    vertex_colors: Optional[np.ndarray] = None,
+) -> Any:
     """
     Create a mesh from vertices and triangles.
 
@@ -42,8 +72,14 @@ def create_mesh(vertices: np.ndarray, triangles: np.ndarray, vertex_colors: Opti
         mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
     return mesh
 
-def create_mesh_from_pcd(pcd: O3dPCD, method: str = 'BPA', radius_multiplier: float = 3.0, 
-                       normal_radius: float = 1.0, normal_max_nn: int = 30) -> O3dTriMesh:
+
+def create_mesh_from_pcd(
+    pcd: Any,
+    method: str = "BPA",
+    radius_multiplier: float = 3.0,
+    normal_radius: float = 1.0,
+    normal_max_nn: int = 30,
+) -> Any:
     """
     Make a mesh from a Point Cloud.
 
@@ -53,20 +89,24 @@ def create_mesh_from_pcd(pcd: O3dPCD, method: str = 'BPA', radius_multiplier: fl
         radius_multiplier (float): Multiplier for the radius used in BPA.
         normal_radius (float): Radius used for normal estimation.
         normal_max_nn (int): Maximum number of nearest neighbors used for normal estimation.
-        
+
     Returns:
         mesh (o3d.geometry.TriangleMesh): The mesh generated from the point cloud.
-    
+
     Raises:
         AssertionError: If the input pcd is not an instance of o3d.geometry.PointCloud.
         TypeError: If an unsupported method is specified.
     """
-    assert(isinstance(pcd,O3dPCD))
+    assert isinstance(pcd, O3dPCD)
 
-    if method == 'BPA' or method == 'bpa':
+    if isinstance(method, str) and method.lower() == "BPA":
         # Estimate normals
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=normal_radius, max_nn=normal_max_nn))
-    
+        pcd.estimate_normals(
+            search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                radius=normal_radius, max_nn=normal_max_nn
+            )
+        )
+
         # Compute mesh using Ball Pivoting Algorithm
         distances = pcd.compute_nearest_neighbor_distance()
         avg_dist = np.mean(distances)
@@ -80,17 +120,19 @@ def create_mesh_from_pcd(pcd: O3dPCD, method: str = 'BPA', radius_multiplier: fl
 
     return mesh
 
-def save_mesh(mesh: O3dTriMesh, path: str):
-    """
-        Save a mesh to a file.
 
-        Args:
-            mesh (O3dTriMesh): The mesh to save.
-            path (str): The file path to save the mesh.
+def save_mesh(mesh: Any, path: str) -> None:
+    """
+    Save a mesh to a file.
+
+    Args:
+        mesh (O3dTriMesh): The mesh to save.
+        path (str): The file path to save the mesh.
     """
     o3d.io.write_triangle_mesh(path, mesh)
-    
-def save_pcd(pcd: O3dPCD, path: str):
+
+
+def save_pcd(pcd: Any, path: str) -> None:
     """
     Save a point cloud to a file.
 
@@ -100,7 +142,8 @@ def save_pcd(pcd: O3dPCD, path: str):
     """
     o3d.io.write_point_cloud(path, pcd)
 
-def load_mesh(path: str) -> O3dTriMesh:
+
+def load_mesh(path: str) -> Any:
     """
     Load a mesh from a file.
 
@@ -112,7 +155,8 @@ def load_mesh(path: str) -> O3dTriMesh:
     """
     return o3d.io.read_triangle_mesh(path)
 
-def load_pcd(path: str) -> O3dPCD:
+
+def load_pcd(path: str) -> Any:
     """
     Load a point cloud from a file.
 
@@ -124,7 +168,8 @@ def load_pcd(path: str) -> O3dPCD:
     """
     return o3d.io.read_point_cloud(path)
 
-def visualize_geometries(geometries: List[O3dGeometry], window_name: str = "Open3D"):
+
+def visualize_geometries(geometries: List[Any], window_name: str = "Open3D") -> None:
     """
     Visualize multiple geometries in a single window.
 
@@ -132,5 +177,6 @@ def visualize_geometries(geometries: List[O3dGeometry], window_name: str = "Open
         geometries (List[o3d.geometry.Geometry]): List of geometries to visualize.
         window_name (str): The window name for visualization. Defaults to "Open3D".
     """
-    if isinstance(geometries,list) is False: geometries = [geometries] 
+    if isinstance(geometries, list) is False:
+        geometries = [geometries]
     o3d.visualization.draw_geometries(geometries, window_name=window_name)
