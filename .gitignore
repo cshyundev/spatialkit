@@ -2,6 +2,9 @@
 test.py
 test.ipynb
 
+## Virtual Environment
+.venv/
+
 ## Development
 .vscode/
 __pycache__

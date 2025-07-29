@@ -31,28 +31,34 @@
 
 ### 필요 조건
 
-- **파이썬 버전**: Python3 >= 3.8
-- **의존성**: 설치 과정에서 필요한 주요 의존성은 자동으로 설치되나, PyTorch는 사용자의 환경에 따라 다른 버전이 필요할 수 있으므로 별도로 설치하는 것을 권장
+- **파이썬 버전**: Python >= 3.12
+- **패키지 관리자**: uv (권장) 또는 pip
+- **의존성**: 설치 과정에서 필요한 모든 의존성은 자동으로 설치됩니다
 
-### 설치 방법
+### uv를 이용한 설치 (권장)
 
-1. 리포지토리 복제
+1. uv 설치 (필요시)
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. 리포지토리 복제
    ```bash
    git clone https://github.com/cshyundev/cv_utils.git
+   cd cv_utils
    ```
-2. 개발 모드로 설치
-    ```bash
-    cd cv_utils
-    pip install -e .
-    ```
 
-### Conda를 이용한 설치
-1. 새 Conda 가상 환경 생성 및 활성화
-    ```bash
-    conda create --name cv_utils python=3.8
-    conda activate cv_utils
+3. 가상환경 생성 및 의존성 설치
+   ```bash
+   uv venv --python 3.12
+   source .venv/bin/activate  # Linux/Mac
+   # .venv\Scripts\activate   # Windows
+   uv pip install -e .
    ```
-2. 리포지토리 복제 
+
+### pip를 이용한 설치
+
+1. 리포지토리 복제
    ```bash
    git clone https://github.com/cshyundev/cv_utils.git
    ```

@@ -1,7 +1,0 @@
-numpy
-matplotlib
-opencv-python
-tifffile
-scikit-image
-open3d
-absl-py
