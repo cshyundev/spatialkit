@@ -31,7 +31,15 @@ from .pose import Pose
 from .rotation import Rotation
 from .tf import Transform
 from .camera import *
-from ..common.logger import *
+from ..common.logger import LOG_CRITICAL, LOG_WARN
+from ..exceptions import (
+    InvalidShapeError,
+    InvalidDimensionError,
+    GeometryError,
+    CalibrationError,
+    ProjectionError,
+    ConversionError
+)
 
 
 def compute_essential_matrix_from_pose(rel_p: Union[Pose, Transform]) -> np.ndarray:
@@ -87,11 +95,21 @@ def compute_fundamental_matrix_from_points(
     if isinstance(pts2, list):
         pts2 = np.array(pts2).T
 
-    assert pts1.shape == pts2.shape, "Point arrays must have the same shape."
-    assert pts1.shape[0] == 2, "Point arrays must have two coordinates."
-    assert (
-        pts1.shape[1] >= 8
-    ), f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
+    if pts1.shape != pts2.shape:
+        raise InvalidShapeError(
+            f"Point arrays must have the same shape, got {pts1.shape} and {pts2.shape}. "
+            f"Please ensure both point sets have matching dimensions."
+        )
+    if pts1.shape[0] != 2:
+        raise InvalidDimensionError(
+            f"Point arrays must have 2 coordinates (x,y), got {pts1.shape[0]}. "
+            f"Expected shape: (2, N) where N is the number of points."
+        )
+    if pts1.shape[1] < 8:
+        raise InvalidDimensionError(
+            f"Fundamental matrix computation requires at least 8 point correspondences, got {pts1.shape[1]}. "
+            f"Please provide at least 8 matching point pairs."
+        )
 
     # Construct matrix A for linear equation system
     x1 = pts1[0, :].reshape(-1, 1)
@@ -130,9 +148,11 @@ def compute_fundamental_matrix_from_essential(
     Raises:
         ValueError: If insufficient or incorrect data is provided.
     """
-    assert (
-        K1.shape == (3, 3) and K2.shape == (3, 3) and E.shape == (3, 3)
-    ), "Intrinsic and Essential matrices must be 3x3."
+    if not (K1.shape == (3, 3) and K2.shape == (3, 3) and E.shape == (3, 3)):
+        raise InvalidShapeError(
+            f"Intrinsic and Essential matrices must be 3x3, got K1: {K1.shape}, K2: {K2.shape}, E: {E.shape}. "
+            f"Please provide valid 3x3 camera matrices."
+        )
     # Compute fundamental matrix from essential matrix
     F = inv(K2).T @ E @ inv(K1)
     return F
@@ -161,11 +181,22 @@ def compute_fundamental_matrix_using_ransac(
         pts1 = np.array(pts1).T
     if isinstance(pts2, list):
         pts2 = np.array(pts2).T
-    assert pts1.shape == pts2.shape, "Point arrays must have the same shape."
-    assert pts1.shape[0] == 2, "Point arrays must have two coordinates."
-    assert (
-        pts1.shape[1] >= 8
-    ), f"The number of corresponding points must be larger than 8, but got {pts1.shape[0]}"
+        
+    if pts1.shape != pts2.shape:
+        raise InvalidShapeError(
+            f"Point arrays must have the same shape, got {pts1.shape} and {pts2.shape}. "
+            f"Please ensure both point sets have matching dimensions."
+        )
+    if pts1.shape[0] != 2:
+        raise InvalidDimensionError(
+            f"Point arrays must have 2 coordinates (x,y), got {pts1.shape[0]}. "
+            f"Expected shape: (2, N) where N is the number of points."
+        )
+    if pts1.shape[1] < 8:
+        raise InvalidDimensionError(
+            f"Fundamental matrix computation requires at least 8 point correspondences, got {pts1.shape[1]}. "
+            f"Please provide at least 8 matching point pairs."
+        )
 
     best_F = None
     best_inliers = 0
@@ -256,10 +287,10 @@ def solve_pnp(
     rays = rays[:, mask]  # delete unavailable rays
 
     if rays.shape[1] < 4:
-        LOG_ERROR(
-            f"Not enough points to solvePnP. available points must be 4 at least, but got {rays.shape[1]}."
+        raise CalibrationError(
+            f"PnP algorithm requires at least 4 points, got {rays.shape[1]}. "
+            f"Please provide at least 4 valid 3D-2D point correspondences."
         )
-        return None
 
     pts2d = dehomo(rays)  # [xd, yd, 1]
 
@@ -269,8 +300,10 @@ def solve_pnp(
     if ret is True:
         return Transform.from_rot_vec_t(rvec, tvec)
     else:
-        LOG_ERROR("Failed to SolvePnP Algorithm.")
-        return None
+        raise CalibrationError(
+            "PnP algorithm failed to find a solution. "
+            "Please check the quality of your 3D-2D point correspondences and camera parameters."
+        )
 
 
 def transition_camera_view(
@@ -626,7 +659,8 @@ def convert_depth_to_point_cloud(
         and map_type != "MPI"
     ):
         LOG_WARN(
-            f"Camera type {cam.cam_type} typically expects MPI depth map, but got {map_type}."
+            f"Camera type {cam.cam_type} typically expects MPI depth map, but got {map_type}. "
+            f"Results may be less accurate."
         )
 
     rays, mask = cam.convert_to_rays()
@@ -700,16 +734,28 @@ def compute_points_for_epipolar_curve(
     Return:
         points (np.ndarray, [2,N]): List of valid 2D points in cam2 image space.
     """
-    assert (
-        isinstance(depth_rng, tuple) and len(depth_rng) == 2
-    ), "depth_rng must be a tuple with two elements."
-    assert pt_cam1.shape == (2, 1), "pt_cam1 must be a 2x1 numpy array."
-    assert max_pts > 0, "max_pts must be greater than 0."
+    if not (isinstance(depth_rng, tuple) and len(depth_rng) == 2):
+        raise InvalidDimensionError(
+            f"depth_rng must be a tuple with two elements, got {type(depth_rng)} with length {len(depth_rng) if hasattr(depth_rng, '__len__') else 'unknown'}. "
+            f"Please provide a tuple like (min_depth, max_depth)."
+        )
+    if pt_cam1.shape != (2, 1):
+        raise InvalidShapeError(
+            f"pt_cam1 must be a 2x1 numpy array, got shape {pt_cam1.shape}. "
+            f"Please provide a 2D point in format [[x], [y]]."
+        )
+    if max_pts <= 0:
+        raise InvalidDimensionError(
+            f"max_pts must be greater than 0, got {max_pts}. "
+            f"Please provide a positive integer for maximum points."
+        )
 
     ray, mask = cam1.convert_to_rays(pt_cam1)
     if mask.sum() == 0:
-        LOG_ERROR("No valid ray found from the given point in cam1.")
-        return None
+        raise ProjectionError(
+            "No valid ray found from the given point in cam1. "
+            "The point may be outside the camera's field of view or invalid."
+        )
 
     def compute_pixel_in_cam2(
         ray: np.ndarray, cam2: Camera, rel_tf: Transform, depth: np.ndarray

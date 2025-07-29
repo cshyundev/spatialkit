@@ -27,6 +27,12 @@ import cv2 as cv
 import numpy as np
 from ..ops.uops import *
 from ..ops.umath import *
+from ..exceptions import (
+    InvalidShapeError,
+    IncompatibleTypeError,
+    InvalidDimensionError,
+    GeometryError
+)
 
 
 def translation(tx: int = 0, ty: int = 0) -> np.ndarray:
@@ -204,11 +210,22 @@ def compute_homography(
         pts1 = np.array(pts1, dtype=float)
     if isinstance(pts2, List):
         pts2 = np.array(pts2, dtype=float)
-    assert isinstance(pts1, type(pts2)), "Two pts1 and pts2 must be same type."
-    assert is_array(pts1) and is_array(pts2), "pts must be ArrayLike type."
-    assert (
-        pts1.shape[0] >= 4
-    ), f"To compute homograpy, correspondence pairs must be larger than 4, but got {pts1.shape[0]}"
+        
+    if not isinstance(pts1, type(pts2)):
+        raise IncompatibleTypeError(
+            f"Point sets must be of the same type, got {type(pts1)} and {type(pts2)}. "
+            f"Please ensure both point sets are either lists or arrays of the same type."
+        )
+    if not (is_array(pts1) and is_array(pts2)):
+        raise IncompatibleTypeError(
+            f"Point sets must be array-like objects, got {type(pts1)} and {type(pts2)}. "
+            f"Please provide numpy arrays or compatible array-like objects."
+        )
+    if pts1.shape[0] < 4:
+        raise InvalidDimensionError(
+            f"Homography computation requires at least 4 point correspondences, got {pts1.shape[0]}. "
+            f"Please provide at least 4 matching point pairs."
+        )
 
     def _normalize_points(pts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -294,15 +311,22 @@ def apply_transform(
     Apply a perspective transformation to the given image.
 
     Args:
-        image (np.ndarray, [H,W] or [H,W,3]): input image array.
-        transform (np.ndarray, [3,3]):  transformation matrix applied in image coordinates.
+        image (np.ndarray): Input image array of shape [H,W] or [H,W,3].
+        transform (np.ndarray): Transformation matrix of shape [3,3] applied in image coordinates.
         output_size (Tuple[int, int]): (out_w, out_h) of the output image.
         inverse (bool): Boolean flag to indicate whether to perform inverse warping (default) or forward warping.
 
     Returns:
-    output (np.ndarray, [out_h,out_w] or [out_h, out_w, 3]): The transformed image
+        np.ndarray: The transformed image of shape [out_h,out_w] or [out_h, out_w, 3].
+        
+    Raises:
+        InvalidShapeError: If transformation matrix is not 3x3.
     """
-    assert transform.shape == (3, 3), "Transformation matrix must be a 3x3 matrix."
+    if transform.shape != (3, 3):
+        raise InvalidShapeError(
+            f"Transformation matrix must be 3x3, got shape {transform.shape}. "
+            f"Please provide a valid 3x3 transformation matrix."
+        )
     transform = transform if inverse else inv(transform)
 
     return cv.warpPerspective(image, transform, output_size)

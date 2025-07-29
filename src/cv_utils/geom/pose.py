@@ -21,6 +21,7 @@ import numpy as np
 from .rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
 from ..ops.uops import *
 from ..ops.umath import *
+from ..exceptions import InvalidShapeError, InvalidDimensionError, IncompatibleTypeError
 
 
 def SE3_to_se3(SE3: ArrayLike) -> ArrayLike:
@@ -41,12 +42,21 @@ def SE3_to_se3(SE3: ArrayLike) -> ArrayLike:
 def se3_to_SE3(se3: ArrayLike) -> ArrayLike:
     """
     Convert se3 vector to SE3 matrix.
+    
     Args:
-        se3: (6,), float, se3 vector (3 for so3 and 3 for translation)
+        se3 (ArrayLike): se3 vector (6,) with first 3 elements as so3 and last 3 as translation.
+        
     Returns:
-        SE3: (4,4), float, SE3 transformation matrix
+        ArrayLike: SE3 transformation matrix (4,4).
+        
+    Raises:
+        InvalidShapeError: If se3 vector is not of shape (6,).
     """
-    assert se3.shape == (6,), "se3 vector must be of shape (6,)"
+    if se3.shape != (6,):
+        raise InvalidShapeError(
+            f"se3 vector must have shape (6,), got {se3.shape}. "
+            f"Expected format: [so3_x, so3_y, so3_z, t_x, t_y, t_z]."
+        )
 
     so3 = se3[:3]
     t = se3[3:]
@@ -71,18 +81,31 @@ class Pose:
 
     def __init__(self, t: Optional[ArrayLike] = None, rot: Optional[Rotation] = None):
         """
-        Initialization Pose Instance
+        Initialize Pose Instance.
+        
         Args:
-            t (ArrayLike, [3,] or [1,3]): translation vector
-            Rotation: Rotation Instance
+            t (ArrayLike, optional): Translation vector of shape (3,) or (1,3). Defaults to zero vector.
+            rot (Rotation, optional): Rotation instance. Defaults to identity rotation.
+            
+        Raises:
+            IncompatibleTypeError: If translation is not array-like.
+            InvalidDimensionError: If translation size is not 3.
         """
         if t is None:
             t = np.array([0.0, 0.0, 0.0])
         if rot is None:
             rot = Rotation.from_mat3(np.eye(3))
 
-        assert is_array(t), "translation must be array type(Tensor or Numpy)."
-        assert t.size == 3, "size of translation must be 3."
+        if not is_array(t):
+            raise IncompatibleTypeError(
+                f"Translation must be array-like (numpy array or tensor), got {type(t)}. "
+                f"Please provide a valid array-like object."
+            )
+        if t.size != 3:
+            raise InvalidDimensionError(
+                f"Translation vector must have exactly 3 elements, got {t.size}. "
+                f"Expected shape: (3,) or (1,3)."
+            )
 
         t = t.reshape(1, 3)
 
@@ -99,11 +122,35 @@ class Pose:
 
     @staticmethod
     def from_rot_vec_t(rot_vec: ArrayLike, t: ArrayLike) -> "Pose":
-        assert is_array(
-            rot_vec
-        ), "rotation vector must be ArrayLike type(Tensor or Numpy)"
-        assert is_array(t), "translation vector must be ArrayLike type(Tensor or Numpy)"
-        assert rot_vec.shape[-1] == 3, "Invalid Shape. rotation vector must be (3,)"
+        """
+        Create Pose from rotation vector and translation.
+        
+        Args:
+            rot_vec (ArrayLike): Rotation vector of shape (..., 3).
+            t (ArrayLike): Translation vector.
+            
+        Returns:
+            Pose: New Pose instance.
+            
+        Raises:
+            IncompatibleTypeError: If inputs are not array-like.
+            InvalidShapeError: If rotation vector doesn't have shape ending with 3.
+        """
+        if not is_array(rot_vec):
+            raise IncompatibleTypeError(
+                f"Rotation vector must be array-like (numpy array or tensor), got {type(rot_vec)}. "
+                f"Please provide a valid array-like object."
+            )
+        if not is_array(t):
+            raise IncompatibleTypeError(
+                f"Translation vector must be array-like (numpy array or tensor), got {type(t)}. "
+                f"Please provide a valid array-like object."
+            )
+        if rot_vec.shape[-1] != 3:
+            raise InvalidShapeError(
+                f"Rotation vector must have last dimension of size 3, got shape {rot_vec.shape}. "
+                f"Expected format: (..., 3)."
+            )
         rot = Rotation.from_so3(rot_vec)
         return Pose(t, rot)
 

@@ -4,6 +4,7 @@ import numpy as np
 import cv_utils as cvu
 from cv_utils.sol import marker
 from cv_utils import FiducialMarkerType
+from cv_utils.exceptions import InvalidMarkerTypeError, IncompatibleTypeError
 import cv2 as cv
 
 class TestInitDetector(unittest.TestCase):
@@ -84,7 +85,7 @@ class TestInitDetector(unittest.TestCase):
                     # Initialization Failed
                     self.fail("OPENCV Detector Initialization Failed.")
             else:
-                with self.assertRaises(ValueError):
+                with self.assertRaises(InvalidMarkerTypeError):
                     marker.OpenCVMarkerDetector(self.pinhole_cam,
                             self.marker_size,
                             marker_type)
@@ -115,7 +116,7 @@ class TestInitDetector(unittest.TestCase):
                     # Initialization Failed
                     self.fail("AprilTag Detector Initialization Failed.")
             else:
-                with self.assertRaises(ValueError):
+                with self.assertRaises(InvalidMarkerTypeError):
                     marker.AprilTagMarkerDetector(self.pinhole_cam,
                             self.marker_size,
                             marker_type)
@@ -145,26 +146,26 @@ class TestInitDetector(unittest.TestCase):
                     # Initialization Failed
                     self.fail("Stag Detector Initialization Failed.")
             else:
-                with self.assertRaises(ValueError):
+                with self.assertRaises(InvalidMarkerTypeError):
                     marker.STagMarkerDetector(self.pinhole_cam,
                             self.marker_size,
                             marker_type)
 
     def test_initialization_arguments_error(self):
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IncompatibleTypeError):
             # wrong cam type
             marker.OpenCVMarkerDetector(None, self.marker_size, self.aruco_type)
         
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(InvalidMarkerTypeError):
             # wrong marker_size type
             marker.OpenCVMarkerDetector(self.pinhole_cam, None, self.aruco_type)
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(InvalidMarkerTypeError):
             # wrong marker_type
             marker.OpenCVMarkerDetector(self.pinhole_cam, self.marker_size, None)
         
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(InvalidMarkerTypeError):
             # negative marker size
             marker.OpenCVMarkerDetector(self.pinhole_cam,-1., self.aruco_type)
 
@@ -224,11 +225,11 @@ class TestDetectMarker(unittest.TestCase):
         )
 
         # invalid image type
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IncompatibleTypeError):
             opencv_detector.detect_marker(None)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IncompatibleTypeError):
             apriltag_detector.detect_marker(None)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IncompatibleTypeError):
             stag_detector.detect_marker(None)
 
     def test_equi_cam_opencv_detect_marker(self):

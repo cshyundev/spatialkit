@@ -25,6 +25,13 @@ from ..ops.uops import *
 from ..ops.umath import *
 from ..common.constant import PI, ROTATION_SO3_THRESHOLD
 from ..common.logger import LOG_CRITICAL
+from ..exceptions import (
+    InvalidShapeError, 
+    InvalidDimensionError, 
+    GeometryError,
+    IncompatibleTypeError,
+    NumericalError
+)
 
 
 class RotType(Enum):
@@ -104,15 +111,22 @@ def is_rpy(x: ArrayLike) -> bool:
 
 def so3_to_SO3(so3: ArrayLike) -> ArrayLike:
     """
-    Transform so3 to Rotation Matrix(SO3)
+    Transform so3 to Rotation Matrix(SO3).
 
     Args:
-        so3 (ArrayLike, [3,]): so3 vector
+        so3 (ArrayLike): so3 vector of shape (3,).
 
     Returns:
-        Mat (ArrayLike, [3,3]): Rotation Matrix
+        ArrayLike: Rotation Matrix of shape (3,3).
+        
+    Raises:
+        InvalidShapeError: If so3 is not of shape (3,).
     """
-    assert is_so3(so3), f"Invaild Shape. so3 must be (3), but got {str(so3.shape)}"
+    if not is_so3(so3):
+        raise InvalidShapeError(
+            f"so3 vector must have shape (3,), got {so3.shape}. "
+            f"Please provide a valid so3 vector."
+        )
     theta = sqrt(so3[0] ** 2 + so3[1] ** 2 + so3[2] ** 2)
     vec = so3 / (theta + 1e-15)
     skew_vec = vec3_to_skew(vec)
@@ -121,16 +135,23 @@ def so3_to_SO3(so3: ArrayLike) -> ArrayLike:
 
 def quat_to_SO3(quat: ArrayLike, is_xyzw: bool) -> ArrayLike:
     """
-    Transform Quaternion to Rotation Matrix(SO3)
+    Transform Quaternion to Rotation Matrix(SO3).
 
     Args:
-        quat (ArrayLike, [4,]):quaternion
-        is_xyzw: bool, quat is real part first. Otherwise, real part is last channel
+        quat (ArrayLike): Quaternion of shape (4,).
+        is_xyzw (bool): If True, quaternion order is (x,y,z,w). If False, order is (w,x,y,z).
 
     Returns:
-        Mat (ArrayLike, [4,]):Rotation Matrix
+        ArrayLike: Rotation Matrix of shape (3,3).
+        
+    Raises:
+        GeometryError: If quaternion is not valid.
     """
-    assert is_quat(quat), "Input is not satisfied to quaternion properties."
+    if not is_quat(quat):
+        raise GeometryError(
+            f"Input quaternion {quat} does not satisfy quaternion properties. "
+            f"Quaternion must be a unit vector of length 4."
+        )
 
     if is_xyzw:  # real part last
         x, y, z, w = quat[0], quat[1], quat[2], quat[3]
@@ -165,15 +186,22 @@ def quat_to_SO3(quat: ArrayLike, is_xyzw: bool) -> ArrayLike:
 
 def rpy_to_SO3(rpy: ArrayLike) -> ArrayLike:
     """
-    Transform RPY (Roll, Pitch, Yaw) to Rotation Matrix (SO3)
+    Transform RPY (Roll, Pitch, Yaw) to Rotation Matrix (SO3).
 
     Args:
-        rpy (ArrayLike, [3,]): RPY angles
+        rpy (ArrayLike): RPY angles of shape (3,).
 
     Returns:
-        Mat (ArrayLike, [3,3]): Rotation Matrix
+        ArrayLike: Rotation Matrix of shape (3,3).
+        
+    Raises:
+        InvalidShapeError: If RPY is not of shape (3,).
     """
-    assert is_rpy(rpy), f"Invalid Shape. RPY must be (3,), but got {str(rpy.shape)}"
+    if not is_rpy(rpy):
+        raise InvalidShapeError(
+            f"RPY angles must have shape (3,), got {rpy.shape}. "
+            f"Expected format: [roll, pitch, yaw]."
+        )
     roll, pitch, yaw = rpy
 
     # Calculate rotation matrix components
@@ -205,15 +233,22 @@ def rpy_to_SO3(rpy: ArrayLike) -> ArrayLike:
 
 def SO3_to_so3(SO3: ArrayLike) -> ArrayLike:
     """
-    Transform SO3 Matrix to so3
+    Transform SO3 Matrix to so3.
 
     Args:
-        SO3 (ArrayLike, [3,3]): SO3 Matrix
+        SO3 (ArrayLike): SO3 Matrix of shape (3,3).
 
     Returns:
-        so3 (ArrayLike, [3,]): so3 vector
+        ArrayLike: so3 vector of shape (3,).
+        
+    Raises:
+        GeometryError: If input is not a valid SO3 matrix.
     """
-    assert is_SO3(SO3), "Input is not satisfied to SO3 properties."
+    if not is_SO3(SO3):
+        raise GeometryError(
+            f"Input matrix does not satisfy SO3 properties (orthogonal matrix with determinant 1). "
+            f"Matrix shape: {SO3.shape}, determinant: {determinant(SO3) if SO3.shape == (3,3) else 'invalid'}."
+        )
 
     theta = arccos((trace(SO3) - 1.0) * 0.5)
     vec = (
@@ -226,17 +261,25 @@ def SO3_to_so3(SO3: ArrayLike) -> ArrayLike:
     return theta * vec
 
 
-def SO3_to_quat(SO3: ArrayLike) -> ArrayLike:
+def SO3_to_quat(SO3: ArrayLike, is_xyzw: bool) -> ArrayLike:
     """
-    Transform Rotation Matrix(SO3) to Quaternion
+    Transform SO3 matrix to quaternion.
 
     Args:
-        Mat (ArrayLike, [3,3]):Rotation Matrix
+        SO3 (ArrayLike): SO3 Matrix of shape (3,3).
+        is_xyzw (bool): If True, returns quaternion in (x,y,z,w) format. If False, (w,x,y,z) format.
 
     Returns:
-        quat (ArrayLike, [4,]):quaternion
+        ArrayLike: Quaternion of shape (4,).
+        
+    Raises:
+        GeometryError: If input is not a valid SO3 matrix.
     """
-    assert is_SO3(SO3), "Input is not satisfied to SO3 properties."
+    if not is_SO3(SO3):
+        raise GeometryError(
+            f"Input matrix does not satisfy SO3 properties (orthogonal matrix with determinant 1). "
+            f"Matrix shape: {SO3.shape}, determinant: {determinant(SO3) if SO3.shape == (3,3) else 'invalid'}."
+        )
     # Extract the elements of the rotation matrix
     r11, r12, r13 = SO3[0, 0], SO3[0, 1], SO3[0, 2]
     r21, r22, r23 = SO3[1, 0], SO3[1, 1], SO3[1, 2]
@@ -274,15 +317,22 @@ def SO3_to_quat(SO3: ArrayLike) -> ArrayLike:
 
 def SO3_to_rpy(SO3: ArrayLike) -> ArrayLike:
     """
-    Transform Rotation Matrix (SO3) to RPY (Roll, Pitch, Yaw)
+    Transform Rotation Matrix (SO3) to RPY (Roll, Pitch, Yaw).
 
     Args:
-        SO3 (ArrayLike, [3,3]): Rotation Matrix
+        SO3 (ArrayLike): Rotation Matrix of shape (3,3).
 
     Returns:
-        rpy (ArrayLike, [3,]): RPY angles
+        ArrayLike: RPY angles of shape (3,).
+        
+    Raises:
+        GeometryError: If input is not a valid SO3 matrix.
     """
-    assert is_SO3(SO3), "Input is not satisfied to SO3 properties."
+    if not is_SO3(SO3):
+        raise GeometryError(
+            f"Input matrix does not satisfy SO3 properties (orthogonal matrix with determinant 1). "
+            f"Matrix shape: {SO3.shape}, determinant: {determinant(SO3) if SO3.shape == (3,3) else 'invalid'}."
+        )
 
     # Extract rotation matrix components
     m00, m01, m02 = SO3[0, 0], SO3[0, 1], SO3[0, 2]
@@ -308,49 +358,72 @@ def SO3_to_rpy(SO3: ArrayLike) -> ArrayLike:
 
 class Rotation:
     """
-    Rotation Class. This can be recieved one of types [SO3, so3, quat, rpy].
-    - If SO3(Rotation matrix), shape must be [3, 3]
-    - If so3(axis angle), shape must be [3]
-    - If quat(Quaternion), shape must be [4]
-    - If rpy (Roll-Pitch-Yaw), shape must be [3]
-    - Default type is SO3 and default shape is [3, 3]
+    Rotation Class that supports various rotation representations.
+    
+    Supported Types:
+    - SO3: Rotation matrix of shape (3, 3)
+    - so3: Axis angle representation of shape (3,)
+    - Quaternion: Unit quaternion of shape (4,)
+    - RPY: Roll-Pitch-Yaw angles of shape (3,)
+    
+    Default representation is SO3 (3x3 rotation matrix).
     """
 
     def __init__(self, data: ArrayLike, rot_type: RotType):
-
-        assert is_array(data)
-        assert len(data.shape) < 3  # invalid data shape
-        assert rot_type in RotType, "Invalid type string"  # invalid type string
+        """
+        Initialize Rotation instance.
+        
+        Args:
+            data (ArrayLike): Rotation data in specified format.
+            rot_type (RotType): Type of rotation representation.
+            
+        Raises:
+            IncompatibleTypeError: If data is not array-like.
+            InvalidDimensionError: If data has invalid dimensions.
+            GeometryError: If data doesn't satisfy rotation properties.
+        """
+        if not is_array(data):
+            raise IncompatibleTypeError(
+                f"Rotation data must be array-like (numpy array or tensor), got {type(data)}. "
+                f"Please provide a valid array-like object."
+            )
+        if len(data.shape) >= 3:
+            raise InvalidDimensionError(
+                f"Rotation data must be 1D or 2D array, got {len(data.shape)}D with shape {data.shape}. "
+                f"Please provide valid rotation data."
+            )
+        if rot_type not in RotType:
+            raise GeometryError(
+                f"Invalid rotation type {rot_type}. "
+                f"Supported types: {[t.value[0] for t in RotType]}."
+            )
 
         if rot_type == RotType.SO3:
-            if is_SO3(data) is False:
-                LOG_CRITICAL("Input does not satisfy the properties of SO3.")
-                self.data = None
-            else:
-                self.data = data
+            if not is_SO3(data):
+                raise GeometryError(
+                    f"Input does not satisfy SO3 properties (orthogonal matrix with determinant 1). "
+                    f"Matrix shape: {data.shape}, determinant: {determinant(data) if data.shape == (3,3) else 'invalid'}."
+                )
+            self.data = data
         elif rot_type == RotType.so3:
-            if is_so3(data) is False:
-                LOG_CRITICAL("Input does not satisfy the properties of so3.")
-                self.data = None
-            else:
-                self.data = so3_to_SO3(data)
+            if not is_so3(data):
+                raise GeometryError(
+                    f"Input does not satisfy so3 properties. Expected shape (3,), got {data.shape}."
+                )
+            self.data = so3_to_SO3(data)
         elif rot_type == RotType.QUAT_XYZW or rot_type == RotType.QUAT_WXYZ:
-            if is_quat(data) is False:
-                LOG_CRITICAL("Input does not satisfy the properties of quaternion.")
-                self.data = None
-            else:
-                self.data = quat_to_SO3(data, rot_type == RotType.QUAT_XYZW)
+            if not is_quat(data):
+                raise GeometryError(
+                    f"Input does not satisfy quaternion properties (unit vector of length 4). "
+                    f"Shape: {data.shape}, norm: {norm(data) if data.shape == (4,) else 'invalid'}."
+                )
+            self.data = quat_to_SO3(data, rot_type == RotType.QUAT_XYZW)
         elif rot_type == RotType.RPY:
-            if is_rpy(data) is False:
-                LOG_CRITICAL("Input does not satisfy the properties of roll-pitch-yaw.")
-                self.data = None
-            else:
-                self.data = rpy_to_SO3(data)
-
-        if self.data is None:
-            raise ValueError(
-                "Input does not satisfy the properties of Rotation representation."
-            )
+            if not is_rpy(data):
+                raise GeometryError(
+                    f"Input does not satisfy RPY properties. Expected shape (3,), got {data.shape}."
+                )
+            self.data = rpy_to_SO3(data)
         self.data = convert_numpy(self.data)
 
     # constructor
@@ -375,22 +448,59 @@ class Rotation:
         return Rotation(rpy, RotType.RPY)
 
     def mat(self) -> np.ndarray:
+        """
+        Get the rotation matrix (SO3) representation.
+        
+        Returns:
+            np.ndarray: 3x3 rotation matrix.
+        """
         return self.data
 
     def so3(self) -> np.ndarray:
+        """
+        Get the so3 (axis-angle) representation.
+        
+        Returns:
+            np.ndarray: so3 vector of shape (3,).
+        """
         return SO3_to_so3(self.data)
 
     def quat(self) -> np.ndarray:
-        return SO3_to_quat(self.data)
+        """
+        Get the quaternion representation in (w,x,y,z) format.
+        
+        Returns:
+            np.ndarray: Quaternion of shape (4,).
+        """
+        return SO3_to_quat(self.data, False)
 
     def rpy(self) -> np.ndarray:
+        """
+        Get the Roll-Pitch-Yaw representation.
+        
+        Returns:
+            np.ndarray: RPY angles of shape (3,).
+        """
         return SO3_to_rpy(self.data)
 
     def apply_pts3d(self, pts3d: ArrayLike) -> ArrayLike:
-        ## R*pts3d: [3,3] * [3,n]
-        assert (
-            pts3d.shape[0] == 3
-        ), f"Invalid Shape. pts3d's shape should be (3,n), but got {str(pts3d.shape)}."
+        """
+        Apply rotation to 3D points.
+        
+        Args:
+            pts3d (ArrayLike): 3D points of shape (3, N).
+            
+        Returns:
+            ArrayLike: Rotated points of shape (3, N).
+            
+        Raises:
+            InvalidShapeError: If pts3d doesn't have correct shape.
+        """
+        if pts3d.shape[0] != 3:
+            raise InvalidShapeError(
+                f"Points must have shape (3, N), got {pts3d.shape}. "
+                f"Please provide 3D points with x, y, z coordinates as the first dimension."
+            )
         mat = self.mat()
         if is_tensor(pts3d):
             mat = convert_tensor(mat, pts3d)
@@ -398,12 +508,33 @@ class Rotation:
         return pts3d  # [3,n]
 
     def inverse_mat(self) -> ArrayLike:
+        """
+        Get the inverse rotation matrix.
+        
+        Returns:
+            ArrayLike: Inverse rotation matrix (transpose of original).
+        """
         return transpose2d(self.data)
 
     def inverse(self) -> "Rotation":
+        """
+        Get the inverse rotation.
+        
+        Returns:
+            Rotation: Inverse rotation instance.
+        """
         return Rotation.from_mat3(self.inverse_mat())
 
     def _dot(self, rot: "Rotation") -> "Rotation":
+        """
+        Compose this rotation with another rotation.
+        
+        Args:
+            rot (Rotation): Another rotation to compose with.
+            
+        Returns:
+            Rotation: Composed rotation.
+        """
         rot1_mat = self.mat()
         rot2_mat = rot.mat()
         rot2_mat = convert_array(rot2_mat, rot1_mat)
@@ -411,30 +542,53 @@ class Rotation:
         return Rotation.from_mat3(rot_mat)
 
     def __mul__(self, other: Any) -> Union["Rotation", ArrayLike]:
+        """
+        Multiplication operator for rotation composition or point transformation.
+        
+        Args:
+            other: Either another Rotation for composition or ArrayLike for point transformation.
+            
+        Returns:
+            Union[Rotation, ArrayLike]: Composed rotation or transformed points.
+            
+        Raises:
+            IncompatibleTypeError: If other is not a supported type.
+        """
         if isinstance(other, Rotation):
             return self._dot(other)
         if is_array(other):
             return self.apply_pts3d(other)
-        raise ValueError("Unsupport Data type for multiplication.")
+        raise IncompatibleTypeError(
+            f"Unsupported data type {type(other)} for multiplication with Rotation. "
+            f"Supported types: Rotation (for composition) or ArrayLike (for point transformation)."
+        )
 
 
 def slerp(r1: Rotation, r2: Rotation, t: float):
     """
-    Spherical Linear Interpolation between two Rotion
+    Spherical Linear Interpolation between two Rotations.
 
-    1. transfrom Rotations to unit quaternions q1,q2
-    2. compute angle "w" between two quaternions: w = cos^-1(q1*q2)
-    3. compute slerp(q1,q2,t) =  sin((1-t)*w)/sin(w)*q1 + sin(tw)/sin(w)*q2
+    Algorithm:
+    1. Transform Rotations to unit quaternions q1, q2
+    2. Compute angle "w" between two quaternions: w = cos^-1(q1*q2)
+    3. Compute slerp(q1,q2,t) = sin((1-t)*w)/sin(w)*q1 + sin(tw)/sin(w)*q2
 
     Args:
-        r1: Rotation, rotation instance
-        r2: Rotation, rotation instance
-        t (float): interploation parameters, 0<=t<=1
+        r1 (Rotation): First rotation instance.
+        r2 (Rotation): Second rotation instance.
+        t (float): Interpolation parameter, must be between 0 and 1.
 
     Returns:
-        slerp(q1,q2,t): Rotation
+        Rotation: Interpolated rotation.
+        
+    Raises:
+        InvalidDimensionError: If t is not between 0 and 1.
     """
-    assert 0.0 <= t <= 1.0, "Interpolation parameters must be between 0 and 1."
+    if not (0.0 <= t <= 1.0):
+        raise InvalidDimensionError(
+            f"Interpolation parameter t must be between 0 and 1, got {t}. "
+            f"Please provide a valid interpolation parameter."
+        )
 
     if t == 1.0:
         return r2

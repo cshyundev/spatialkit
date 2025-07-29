@@ -1,7 +1,7 @@
 # 프로젝트 아키텍처 및 의존성 문서
 
 **최종 수정 날짜:** 2025년 2월 16일  
-**버전:** v0.2.1
+**버전:** 0.2.1-alpha
 
 이 문서는 프로젝트의 아키텍처 구조와 각 패키지의 역할 및 의존성에 대해 설명한다. 이 정보는 프로젝트의 설계 의도를 이해하고, 각 구성요소 간의 상호작용을 파악하는 데 도움을 준다.
 
@@ -36,7 +36,7 @@ cv_utils/
 |      │   
 |      ├── utils/  # Package for General utility 
 |      │   ├── point_selector.py        # Point Selector Class
-|      │   ├── vis.py                   # imgage utilites for visualization
+|      │   ├── vis.py                   # image utilities for visualization
 |      │   ├── io.py                    # File Utilities
 |      │   └── metrics.py (TBD)         # Metric functions
 |      │
@@ -87,14 +87,14 @@ cv_utils/
 
 
 ### Externals
-`external` 패키지는 외부 라이브러리와의 통합을 관리한다.
+`externals` 패키지는 외부 라이브러리와의 통합을 관리한다.
 - **o3d**: Open3D 라이브러리를 이용한 메시 연산을 제공한다.
 
 
 ### Solutions
 `sol` 패키지는 특정 애플리케이션 또는 작업을 위해 다른 패키지들의 기능을 활용하여 구현된 기능을 포함한다.
-- **marker.py**: Fiducial Marker와 관련된 기능을 제공한다.
-- **mvs.py**: Multi View Stereo 및 3D 복원과 관련된 기능을 제공한다.
+- **marker**: Fiducial Marker와 관련된 기능을 제공한다.
+- **mvs**: Multi View Stereo 및 3D 복원과 관련된 기능을 제공한다.
 
 
 

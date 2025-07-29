@@ -17,6 +17,12 @@ from .pose import Pose
 from ..ops.uops import *
 from ..ops.uops import ArrayLike
 from ..ops.umath import *
+from ..exceptions import (
+    InvalidShapeError,
+    InvalidDimensionError,
+    IncompatibleTypeError,
+    GeometryError
+)
 
 
 class Transform:
@@ -30,13 +36,32 @@ class Transform:
     """
 
     def __init__(self, t: Optional[ArrayLike] = None, rot: Optional[Rotation] = None):
+        """
+        Initialize Transform instance.
+        
+        Args:
+            t (ArrayLike, optional): Translation vector. Defaults to zero vector.
+            rot (Rotation, optional): Rotation instance. Defaults to identity rotation.
+            
+        Raises:
+            IncompatibleTypeError: If translation is not array-like.
+            InvalidDimensionError: If translation size is not 3.
+        """
         if t is None:
             t = np.array([0.0, 0.0, 0.0])
         if rot is None:
             rot = Rotation.from_mat3(np.eye(3))
 
-        assert is_array(t), "Translation must be an array type (Tensor or Numpy)."
-        assert t.size == 3, "Size of translation must be 3."
+        if not is_array(t):
+            raise IncompatibleTypeError(
+                f"Translation must be array-like (numpy array or tensor), got {type(t)}. "
+                f"Please provide a valid array-like object."
+            )
+        if t.size != 3:
+            raise InvalidDimensionError(
+                f"Translation vector must have exactly 3 elements, got {t.size}. "
+                f"Expected shape: (3,) or (1,3)."
+            )
 
         t = t.reshape(1, 3)
 
@@ -57,20 +82,36 @@ class Transform:
         Create a Transform from a rotation vector and translation vector.
 
         Args:
-            rot_vec (ArrayLike, [3,]): Rotation vector
-            t (ArrayLike, [3,]): translation vector
+            rot_vec (ArrayLike): Rotation vector of shape (3,).
+            t (ArrayLike): Translation vector of shape (3,).
 
         Returns:
-            Transform: Transform instance
+            Transform: Transform instance.
+            
+        Raises:
+            IncompatibleTypeError: If inputs are not array-like.
+            InvalidDimensionError: If vectors don't have size 3.
         """
-        assert is_array(
-            rot_vec
-        ), "Rotation vector must be ArrayLike type (Tensor or Numpy)"
-        assert is_array(
-            t
-        ), "Translation vector must be ArrayLike type (Tensor or Numpy)"
-        assert rot_vec.size == 3, "Invalid Shape. Rotation vector must be 3 size"
-        assert t.size == 3, "Invalid Shape. Translation vector must be 3 size"
+        if not is_array(rot_vec):
+            raise IncompatibleTypeError(
+                f"Rotation vector must be array-like (numpy array or tensor), got {type(rot_vec)}. "
+                f"Please provide a valid array-like object."
+            )
+        if not is_array(t):
+            raise IncompatibleTypeError(
+                f"Translation vector must be array-like (numpy array or tensor), got {type(t)}. "
+                f"Please provide a valid array-like object."
+            )
+        if rot_vec.size != 3:
+            raise InvalidDimensionError(
+                f"Rotation vector must have exactly 3 elements, got {rot_vec.size}. "
+                f"Expected shape: (3,)."
+            )
+        if t.size != 3:
+            raise InvalidDimensionError(
+                f"Translation vector must have exactly 3 elements, got {t.size}. "
+                f"Expected shape: (3,)."
+            )
         rot = Rotation.from_so3(
             rot_vec.reshape(
                 -1,
@@ -84,16 +125,25 @@ class Transform:
         Create a Transform from a 4x4 transformation matrix.
 
         Args:
-            mat4 (ArrayLike, [4,4] or [3,4]): transformation matrix
+            mat4 (ArrayLike): Transformation matrix of shape (4,4) or (3,4).
 
         Returns:
-            Transform: Transform instance
+            Transform: Transform instance.
+            
+        Raises:
+            IncompatibleTypeError: If mat4 is not array-like.
+            InvalidShapeError: If mat4 doesn't have shape (4,4) or (3,4).
         """
-        assert is_array(mat4), "mat4 must be array type (Tensor or Numpy)"
-        assert mat4.shape == (4, 4) or mat4.shape == (
-            3,
-            4,
-        ), "Invalid Shape. The shape of mat4 must be (4,4) or (3,4)"
+        if not is_array(mat4):
+            raise IncompatibleTypeError(
+                f"Transformation matrix must be array-like (numpy array or tensor), got {type(mat4)}. "
+                f"Please provide a valid array-like object."
+            )
+        if mat4.shape not in [(4, 4), (3, 4)]:
+            raise InvalidShapeError(
+                f"Transformation matrix must have shape (4,4) or (3,4), got {mat4.shape}. "
+                f"Please provide a valid transformation matrix."
+            )
         return Transform(mat4[:3, 3], Rotation.from_mat3(mat4[:3, :3]))
 
     @staticmethod
@@ -180,15 +230,20 @@ class Transform:
         Get the origin and direction vectors from rays (local coordinates).
 
         Args:
-            rays (ArrayLike, [3,N]): camera rays from origin
+            rays (ArrayLike): Camera rays from origin of shape (3,N) or (3,).
 
         Returns:
-            origins (ArrayLike, [N,3]): origin in world coordinates
-            directions (ArrayLike, [N,3]): unit direction vector in world coordinates
+            origins (ArrayLike): Origin in world coordinates of shape (N,3).
+            directions (ArrayLike): Unit direction vector in world coordinates of shape (N,3).
+            
+        Raises:
+            InvalidShapeError: If rays don't have the correct shape.
         """
-        assert (
-            len(rays.shape) <= 2 and rays.shape[0] == 3
-        ), "Invalid Shape. Ray's shape must be (3, n) or (3)"
+        if not (len(rays.shape) <= 2 and rays.shape[0] == 3):
+            raise InvalidShapeError(
+                f"Rays must have shape (3,N) or (3,), got {rays.shape}. "
+                f"Please provide valid camera ray vectors."
+            )
         if len(rays.shape) == 2:
             n_rays = rays.shape[1]
         else:

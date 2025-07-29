@@ -27,6 +27,7 @@ from typing import Optional, List, Any
 import numpy as np
 import open3d as o3d
 from .common import O3dPCD, O3dTriMesh
+from ...exceptions import InvalidShapeError, RenderingError, IncompatibleTypeError, IOError, FileNotFoundError, FileFormatError
 
 
 def create_point_cloud(pt3d: np.ndarray, colors: Optional[np.ndarray] = None) -> Any:
@@ -39,14 +40,39 @@ def create_point_cloud(pt3d: np.ndarray, colors: Optional[np.ndarray] = None) ->
 
     Returns:
         O3dPCD: The created point cloud.
+        
+    Raises:
+        InvalidShapeError: If pt3d is not a 2D array with shape (N, 3) or colors have incompatible shape.
+        RenderingError: If point cloud creation fails.
     """
-    pcd = O3dPCD()
-    pcd.points = o3d.utility.Vector3dVector(pt3d)
+    if not isinstance(pt3d, np.ndarray) or pt3d.ndim != 2 or pt3d.shape[1] != 3:
+        raise InvalidShapeError(
+            f"pt3d must be a 2D array with shape (N, 3), got {type(pt3d)} with shape {getattr(pt3d, 'shape', 'unknown')}. "
+            f"Please provide a valid array of 3D points."
+        )
+    
     if colors is not None:
-        if colors.dtype == np.uint8:
-            colors = colors.astype(np.float64) / 255.0
-        pcd.colors = o3d.utility.Vector3dVector(colors)
-    return pcd
+        if not isinstance(colors, np.ndarray) or colors.ndim != 2 or colors.shape[1] != 3:
+            raise InvalidShapeError(
+                f"colors must be a 2D array with shape (N, 3), got {type(colors)} with shape {getattr(colors, 'shape', 'unknown')}. "
+                f"Please provide a valid array of RGB colors."
+            )
+        if colors.shape[0] != pt3d.shape[0]:
+            raise InvalidShapeError(
+                f"Number of colors ({colors.shape[0]}) must match number of points ({pt3d.shape[0]}). "
+                f"Please ensure colors and points have the same count."
+            )
+
+    try:
+        pcd = O3dPCD()
+        pcd.points = o3d.utility.Vector3dVector(pt3d)
+        if colors is not None:
+            if colors.dtype == np.uint8:
+                colors = colors.astype(np.float64) / 255.0
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+        return pcd
+    except Exception as e:
+        raise RenderingError(f"Failed to create point cloud: {e}") from e
 
 
 def create_mesh(
@@ -64,13 +90,44 @@ def create_mesh(
 
     Returns:
         o3d.geometry.TriangleMesh: The created mesh.
+        
+    Raises:
+        InvalidShapeError: If vertices, triangles, or vertex_colors have incorrect shapes.
+        RenderingError: If mesh creation fails.
     """
-    mesh = o3d.geometry.TriangleMesh()
-    mesh.vertices = o3d.utility.Vector3dVector(vertices)
-    mesh.triangles = o3d.utility.Vector3iVector(triangles)
+    if not isinstance(vertices, np.ndarray) or vertices.ndim != 2 or vertices.shape[1] != 3:
+        raise InvalidShapeError(
+            f"vertices must be a 2D array with shape (N, 3), got {type(vertices)} with shape {getattr(vertices, 'shape', 'unknown')}. "
+            f"Please provide a valid array of vertex positions."
+        )
+    
+    if not isinstance(triangles, np.ndarray) or triangles.ndim != 2 or triangles.shape[1] != 3:
+        raise InvalidShapeError(
+            f"triangles must be a 2D array with shape (M, 3), got {type(triangles)} with shape {getattr(triangles, 'shape', 'unknown')}. "
+            f"Please provide a valid array of triangle indices."
+        )
+    
     if vertex_colors is not None:
-        mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
-    return mesh
+        if not isinstance(vertex_colors, np.ndarray) or vertex_colors.ndim != 2 or vertex_colors.shape[1] != 3:
+            raise InvalidShapeError(
+                f"vertex_colors must be a 2D array with shape (N, 3), got {type(vertex_colors)} with shape {getattr(vertex_colors, 'shape', 'unknown')}. "
+                f"Please provide a valid array of vertex colors."
+            )
+        if vertex_colors.shape[0] != vertices.shape[0]:
+            raise InvalidShapeError(
+                f"Number of vertex colors ({vertex_colors.shape[0]}) must match number of vertices ({vertices.shape[0]}). "
+                f"Please ensure colors and vertices have the same count."
+            )
+
+    try:
+        mesh = o3d.geometry.TriangleMesh()
+        mesh.vertices = o3d.utility.Vector3dVector(vertices)
+        mesh.triangles = o3d.utility.Vector3iVector(triangles)
+        if vertex_colors is not None:
+            mesh.vertex_colors = o3d.utility.Vector3dVector(vertex_colors)
+        return mesh
+    except Exception as e:
+        raise RenderingError(f"Failed to create mesh: {e}") from e
 
 
 def create_mesh_from_pcd(
@@ -94,12 +151,23 @@ def create_mesh_from_pcd(
         mesh (o3d.geometry.TriangleMesh): The mesh generated from the point cloud.
 
     Raises:
-        AssertionError: If the input pcd is not an instance of o3d.geometry.PointCloud.
-        TypeError: If an unsupported method is specified.
+        IncompatibleTypeError: If the input pcd is not an instance of o3d.geometry.PointCloud.
+        IncompatibleTypeError: If an unsupported method is specified.
+        RenderingError: If mesh generation fails.
     """
-    assert isinstance(pcd, O3dPCD)
+    if not isinstance(pcd, O3dPCD):
+        raise IncompatibleTypeError(
+            f"pcd must be an instance of o3d.geometry.PointCloud, got {type(pcd)}. "
+            f"Please provide a valid Open3D PointCloud object."
+        )
 
-    if isinstance(method, str) and method.lower() == "BPA":
+    if not isinstance(method, str) or method.lower() != "bpa":
+        raise IncompatibleTypeError(
+            f"Unsupported method '{method}'. Currently only 'BPA' (Ball Pivoting Algorithm) is supported. "
+            f"Please use method='BPA'."
+        )
+
+    try:
         # Estimate normals
         pcd.estimate_normals(
             search_param=o3d.geometry.KDTreeSearchParamHybrid(
@@ -115,10 +183,10 @@ def create_mesh_from_pcd(
         mesh = O3dTriMesh.create_from_point_cloud_ball_pivoting(
             pcd, o3d.utility.DoubleVector([radius, radius * 2, radius * 4])
         )
-    else:
-        raise TypeError(f"Unsupported method: {method}")
-
-    return mesh
+        
+        return mesh
+    except Exception as e:
+        raise RenderingError(f"Failed to create mesh from point cloud: {e}") from e
 
 
 def save_mesh(mesh: Any, path: str) -> None:
@@ -128,8 +196,23 @@ def save_mesh(mesh: Any, path: str) -> None:
     Args:
         mesh (O3dTriMesh): The mesh to save.
         path (str): The file path to save the mesh.
+        
+    Raises:
+        IncompatibleTypeError: If mesh is not a valid Open3D TriangleMesh.
+        IOError: If file saving fails.
     """
-    o3d.io.write_triangle_mesh(path, mesh)
+    if not isinstance(mesh, O3dTriMesh):
+        raise IncompatibleTypeError(
+            f"mesh must be an instance of o3d.geometry.TriangleMesh, got {type(mesh)}. "
+            f"Please provide a valid Open3D TriangleMesh object."
+        )
+    
+    try:
+        success = o3d.io.write_triangle_mesh(path, mesh)
+        if not success:
+            raise IOError(f"Failed to save mesh to '{path}'. Please check the file path and permissions.")
+    except Exception as e:
+        raise IOError(f"Failed to save mesh to '{path}': {e}") from e
 
 
 def save_pcd(pcd: Any, path: str) -> None:
@@ -139,8 +222,23 @@ def save_pcd(pcd: Any, path: str) -> None:
     Args:
         pcd (o3d.geometry.PointCloud): The point cloud to save.
         path (str): The file path to save the point cloud.
+        
+    Raises:
+        IncompatibleTypeError: If pcd is not a valid Open3D PointCloud.
+        IOError: If file saving fails.
     """
-    o3d.io.write_point_cloud(path, pcd)
+    if not isinstance(pcd, O3dPCD):
+        raise IncompatibleTypeError(
+            f"pcd must be an instance of o3d.geometry.PointCloud, got {type(pcd)}. "
+            f"Please provide a valid Open3D PointCloud object."
+        )
+    
+    try:
+        success = o3d.io.write_point_cloud(path, pcd)
+        if not success:
+            raise IOError(f"Failed to save point cloud to '{path}'. Please check the file path and permissions.")
+    except Exception as e:
+        raise IOError(f"Failed to save point cloud to '{path}': {e}") from e
 
 
 def load_mesh(path: str) -> Any:
@@ -152,8 +250,29 @@ def load_mesh(path: str) -> Any:
 
     Returns:
         o3d.geometry.TriangleMesh: The loaded mesh.
+        
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        FileFormatError: If the file format is not supported or the file is corrupted.
+        IOError: If file loading fails.
     """
-    return o3d.io.read_triangle_mesh(path)
+    import os
+    
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Mesh file not found: '{path}'. Please check the file path and ensure the file exists."
+        )
+    
+    try:
+        mesh = o3d.io.read_triangle_mesh(path)
+        if len(mesh.vertices) == 0:
+            raise FileFormatError(
+                f"Failed to load mesh from '{path}': empty or invalid mesh data. "
+                f"Please ensure the file contains valid mesh data and is in a supported format."
+            )
+        return mesh
+    except Exception as e:
+        raise IOError(f"Failed to load mesh from '{path}': {e}") from e
 
 
 def load_pcd(path: str) -> Any:
@@ -165,8 +284,29 @@ def load_pcd(path: str) -> Any:
 
     Returns:
         o3d.geometry.PointCloud: The loaded point cloud.
+        
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        FileFormatError: If the file format is not supported or the file is corrupted.
+        IOError: If file loading fails.
     """
-    return o3d.io.read_point_cloud(path)
+    import os
+    
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Point cloud file not found: '{path}'. Please check the file path and ensure the file exists."
+        )
+    
+    try:
+        pcd = o3d.io.read_point_cloud(path)
+        if len(pcd.points) == 0:
+            raise FileFormatError(
+                f"Failed to load point cloud from '{path}': empty or invalid point cloud data. "
+                f"Please ensure the file contains valid point cloud data and is in a supported format."
+            )
+        return pcd
+    except Exception as e:
+        raise IOError(f"Failed to load point cloud from '{path}': {e}") from e
 
 
 def visualize_geometries(geometries: List[Any], window_name: str = "Open3D") -> None:
@@ -176,7 +316,28 @@ def visualize_geometries(geometries: List[Any], window_name: str = "Open3D") -> 
     Args:
         geometries (List[o3d.geometry.Geometry]): List of geometries to visualize.
         window_name (str): The window name for visualization. Defaults to "Open3D".
+        
+    Raises:
+        IncompatibleTypeError: If geometries is not a list or contains invalid geometry objects.
+        RenderingError: If visualization fails.
     """
-    if isinstance(geometries, list) is False:
+    if not isinstance(geometries, list):
         geometries = [geometries]
-    o3d.visualization.draw_geometries(geometries, window_name=window_name)
+    
+    if not geometries:
+        raise IncompatibleTypeError(
+            "geometries list cannot be empty. Please provide at least one geometry object to visualize."
+        )
+    
+    # Validate all geometries are valid Open3D objects
+    for i, geom in enumerate(geometries):
+        if not hasattr(geom, 'get_geometry_type'):
+            raise IncompatibleTypeError(
+                f"geometries[{i}] is not a valid Open3D geometry object: {type(geom)}. "
+                f"Please ensure all objects in the list are valid Open3D geometry instances."
+            )
+    
+    try:
+        o3d.visualization.draw_geometries(geometries, window_name=window_name)
+    except Exception as e:
+        raise RenderingError(f"Failed to visualize geometries: {e}") from e

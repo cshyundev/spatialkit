@@ -35,6 +35,12 @@ from ...ops.uops import ArrayLike, convert_numpy, is_array, swapaxes
 from .marker import Marker, FiducialMarkerType
 from ...utils.vis import draw_polygon
 from ...common.logger import LOG_INFO
+from ...exceptions import (
+    InvalidMarkerTypeError, 
+    MarkerDetectionError,
+    InvalidShapeError,
+    IncompatibleTypeError
+)
 
 
 # Abstract Fiducial Marker Detector
@@ -73,19 +79,38 @@ class MarkerDetector:
             cam (Camera): A camera object containing intrinsic/extrinsic parameters.
             marker_size (float): The side length of the marker in meters.
             marker_type (FiducialMarkerType): The specific marker dictionary type to use.
+            
+        Raises:
+            IncompatibleTypeError: If cam is not a Camera instance.
+            InvalidMarkerTypeError: If marker_size is not positive or marker_type is invalid.
         """
         # Arguments Check
-        assert isinstance(cam, Camera), f"cam must be Camera type, but got {type(cam)}."
-        assert isinstance(
-            marker_size, float
-        ), f"marker_size must be float type, but got {type(marker_size)}."
-        assert isinstance(
-            marker_type, FiducialMarkerType
-        ), f"marker_type must be FiducialMarkerType, but got {marker_type}."
-        assert marker_size > 0.0, "marker size must be positive."
+        if not isinstance(cam, Camera):
+            raise IncompatibleTypeError(
+                f"Camera must be a Camera instance, got {type(cam)}. "
+                f"Please provide a valid Camera object."
+            )
+        
+        if not isinstance(marker_size, (int, float)):
+            raise InvalidMarkerTypeError(
+                f"Marker size must be a number, got {type(marker_size)}. "
+                f"Please provide a valid positive number."
+            )
+        
+        if marker_size <= 0.0:
+            raise InvalidMarkerTypeError(
+                f"Marker size must be positive, got {marker_size}. "
+                f"Please provide a positive marker size value."
+            )
+        
+        if not isinstance(marker_type, FiducialMarkerType):
+            raise InvalidMarkerTypeError(
+                f"Marker type must be a FiducialMarkerType enum, got {type(marker_type)}. "
+                f"Please provide a valid FiducialMarkerType."
+            )
 
         self._cam: Camera = cam
-        self._marker_size: float = marker_size
+        self._marker_size: float = float(marker_size)
         self._marker_type: FiducialMarkerType = marker_type
 
         # 3D corner
@@ -117,6 +142,9 @@ class MarkerDetector:
             List[Marker]: A list of Marker objects containing IDs, corner points,
                           and camera-relative pose information.
 
+        Raises:
+            MarkerDetectionError: This is an abstract method that must be implemented in subclasses.
+
         Note:
             - This is an abstract method; it must be implemented in a subclass.
             - The typical flow involves:
@@ -124,7 +152,10 @@ class MarkerDetector:
                 2) Pose estimation using solvePnP or a similar approach.
                 3) Creating Marker instances with the results.
         """
-        raise NotImplementedError
+        raise MarkerDetectionError(
+            "detect_marker is an abstract method and must be implemented in a subclass. "
+            "Please use OpenCVMarkerDetector, AprilTagMarkerDetector, or STagMarkerDetector."
+        )
 
     def draw_axes(
         self,
@@ -157,6 +188,10 @@ class MarkerDetector:
                 The image with axes drawn. For grayscale images,
                 axes are drawn with different intensities; for color images,
                 they are drawn in RGB colors.
+                
+        Raises:
+            InvalidShapeError: If image dimensions are invalid.
+            MarkerDetectionError: If marker visualization fails.
 
         Notes:
             - Four points are defined in marker-local space:
@@ -239,8 +274,16 @@ class MarkerDetector:
             np.ndarray:
                 A copy of the input image with the markers' IDs and axes drawn.
                 The output remains single-channel for grayscale images and multi-channel for color images.
+                
+        Raises:
+            IncompatibleTypeError: If image is not an array-like object.
         """
-        assert is_array(image), f"image must be ArrayLike, but got {type(image)}."
+        if not is_array(image):
+            raise IncompatibleTypeError(
+                f"Image must be ArrayLike (numpy or torch), got {type(image)}. "
+                f"Please provide a valid image array."
+            )
+        
         image = convert_numpy(image)
         is_grayscale = len(image.shape) == 2
         out_img = image.copy()
@@ -336,34 +379,64 @@ class OpenCVMarkerDetector(MarkerDetector):
             marker_type (FiducialMarkerType): The specific OpenCV dictionary type to use.
 
         Raises:
-            ValueError: If the provided marker_type is not recognized as a valid OpenCV type.
+            InvalidMarkerTypeError: If the provided marker_type is not recognized as a valid OpenCV type.
         """
         super(OpenCVMarkerDetector, self).__init__(cam, marker_size, marker_type)
 
         # Check if the provided marker_type is a valid dictionary
         if marker_type not in self._VALID_OPENCV_TYPES_MAP:
-            raise ValueError(
-                f"{marker_type} is not a valid dictionary type opencv supported."
+            raise InvalidMarkerTypeError(
+                f"Marker type {marker_type} is not supported by OpenCV detector. "
+                f"Supported types: {list(self._VALID_OPENCV_TYPES_MAP.keys())}. "
+                f"Please use a valid OpenCV marker dictionary type."
             )
 
-        _opencv_dict = cv.aruco.getPredefinedDictionary(
-            self._VALID_OPENCV_TYPES_MAP[marker_type]
-        )
-        _opencv_detect_params = cv.aruco.DetectorParameters()
-        self._opencv_detector = cv.aruco.ArucoDetector(
-            _opencv_dict, _opencv_detect_params
-        )
+        try:
+            _opencv_dict = cv.aruco.getPredefinedDictionary(
+                self._VALID_OPENCV_TYPES_MAP[marker_type]
+            )
+            _opencv_detect_params = cv.aruco.DetectorParameters()
+            self._opencv_detector = cv.aruco.ArucoDetector(
+                _opencv_dict, _opencv_detect_params
+            )
+        except Exception as e:
+            raise MarkerDetectionError(
+                f"Failed to initialize OpenCV ArUco detector: {e}. "
+                f"Please check your OpenCV installation and marker type."
+            ) from e
 
     def detect_marker(
         self, image: ArrayLike, estimate_pose: bool = True
     ) -> List[Marker]:
+        """
+        Detects OpenCV ArUco markers in the input image and returns a list of Marker objects.
 
-        assert is_array(
-            image
-        ), f"image must be ArrayLike(Numpy or Torch), but got {type(image)}."
+        Args:
+            image (ArrayLike, [H,W,3] or [H,W]): An input image (RGB or grayscale).
+            estimate_pose (bool): If True, estimate pose using the PnP algorithm.
+
+        Returns:
+            List[Marker]: A list of detected Marker objects with ID, corner points,
+                          and pose information (if pose estimation was successful).
+                          
+        Raises:
+            IncompatibleTypeError: If image is not an array-like object.
+            MarkerDetectionError: If marker detection fails.
+        """
+        if not is_array(image):
+            raise IncompatibleTypeError(
+                f"Image must be ArrayLike (numpy or torch), got {type(image)}. "
+                f"Please provide a valid image array."
+            )
+        
         image = convert_numpy(image)
+        
         # Detect markers
-        result = self._opencv_detector.detectMarkers(image)
+        try:
+            result = self._opencv_detector.detectMarkers(image)
+        except Exception as e:
+            raise MarkerDetectionError(f"OpenCV marker detection failed: {e}") from e
+        
         # If no markers found, return empty list
         if result is not None:
             corners, ids, _ = result
@@ -381,13 +454,17 @@ class OpenCVMarkerDetector(MarkerDetector):
 
             if estimate_pose:
                 # SolvePnP
-                marker2cam: Transform = solve_pnp(
-                    swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
-                )
-                if marker2cam is None:
+                try:
+                    marker2cam: Transform = solve_pnp(
+                        swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
+                    )
+                    if marker2cam is None:
+                        continue
+                    # Build Marker object
+                    marker = Marker(marker_id, marker2cam, corner_2d)
+                except Exception as e:
+                    # If pose estimation fails, skip this marker
                     continue
-                # Build Marker object
-                marker = Marker(marker_id, marker2cam, corner_2d)
             else:
                 marker = Marker(id=marker_id, corners=corner_2d)
             detected_markers.append(marker)
@@ -443,34 +520,52 @@ class AprilTagMarkerDetector(MarkerDetector):
             decode_sharpening (float): Sharpening factor for tag decoding.
 
         Raises:
-            ValueError: If the marker_type is not supported for AprilTag detection.
+            InvalidMarkerTypeError: If the marker_type is not supported for AprilTag detection.
+            MarkerDetectionError: If detector initialization fails.
         """
         super().__init__(cam, marker_size, marker_type)
 
         if marker_type in self._DT_SUPPORT_APRILTAG_TYPES_STR:
             families = self._DT_SUPPORT_APRILTAG_TYPES_STR[marker_type]
-            self._apriltag_detector = Detector(
-                searchpath=["apriltags"],
-                families=families,
-                nthreads=nthreads,
-                quad_decimate=quad_decimate,
-                quad_sigma=quad_sigma,
-                refine_edges=refine_edges,
-                decode_sharpening=decode_sharpening,
-            )
-            self._use_opencv_deatector = False
+            try:
+                self._apriltag_detector = Detector(
+                    searchpath=["apriltags"],
+                    families=families,
+                    nthreads=nthreads,
+                    quad_decimate=quad_decimate,
+                    quad_sigma=quad_sigma,
+                    refine_edges=refine_edges,
+                    decode_sharpening=decode_sharpening,
+                )
+                self._use_opencv_deatector = False
+            except Exception as e:
+                raise MarkerDetectionError(
+                    f"Failed to initialize dt_apriltags detector: {e}. "
+                    f"Please check your dt_apriltags installation."
+                ) from e
         elif marker_type in self._OPENCV_SUPPORT_APRILTAG_TYPES:
-            _opencv_dict = cv.aruco.getPredefinedDictionary(
-                self._OPENCV_SUPPORT_APRILTAG_TYPES[marker_type]
-            )
-            _opencv_detect_params = cv.aruco.DetectorParameters()
-            self._apriltag_detector = cv.aruco.ArucoDetector(
-                _opencv_dict, _opencv_detect_params
-            )
-            self._use_opencv_deatector = True
-            LOG_INFO("This MarkerType is processed to OpenCV.")
+            try:
+                _opencv_dict = cv.aruco.getPredefinedDictionary(
+                    self._OPENCV_SUPPORT_APRILTAG_TYPES[marker_type]
+                )
+                _opencv_detect_params = cv.aruco.DetectorParameters()
+                self._apriltag_detector = cv.aruco.ArucoDetector(
+                    _opencv_dict, _opencv_detect_params
+                )
+                self._use_opencv_deatector = True
+                LOG_INFO("This MarkerType is processed to OpenCV.")
+            except Exception as e:
+                raise MarkerDetectionError(
+                    f"Failed to initialize OpenCV AprilTag detector: {e}. "
+                    f"Please check your OpenCV installation."
+                ) from e
         else:
-            raise ValueError(f"{marker_type} is not a AprilTag Type.")
+            raise InvalidMarkerTypeError(
+                f"Marker type {marker_type} is not supported by AprilTag detector. "
+                f"Supported dt_apriltags types: {list(self._DT_SUPPORT_APRILTAG_TYPES_STR.keys())}. "
+                f"Supported OpenCV types: {list(self._OPENCV_SUPPORT_APRILTAG_TYPES.keys())}. "
+                f"Please use a valid AprilTag marker type."
+            )
 
     def detect_marker(
         self, image: ArrayLike, estimate_pose: bool = True
@@ -489,33 +584,43 @@ class AprilTagMarkerDetector(MarkerDetector):
         Returns:
             List[Marker]: A list of detected Marker objects with ID, corner points,
                           and pose information (if pose estimation was successful).
+                          
+        Raises:
+            IncompatibleTypeError: If image is not an array-like object.
+            MarkerDetectionError: If marker detection fails.
         """
-        assert is_array(
-            image
-        ), f"image must be ArrayLike(Numpy or Torch), but got {type(image)}."
+        if not is_array(image):
+            raise IncompatibleTypeError(
+                f"Image must be ArrayLike (numpy or torch), got {type(image)}. "
+                f"Please provide a valid image array."
+            )
+        
         image = convert_numpy(image)
 
-        if self._use_opencv_deatector:
-            corners, ids, _ = self._apriltag_detector(image)
-            if ids is None:
-                return []
-        else:
-            # Convert image to grayscale if needed
-            if image.ndim == 3:
-                image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
-            detections: List[Detection] = self._apriltag_detector.detect(
-                image, estimate_tag_pose=False
-            )
+        try:
+            if self._use_opencv_deatector:
+                corners, ids, _ = self._apriltag_detector.detectMarkers(image)
+                if ids is None:
+                    return []
+            else:
+                # Convert image to grayscale if needed
+                if image.ndim == 3:
+                    image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+                detections: List[Detection] = self._apriltag_detector.detect(
+                    image, estimate_tag_pose=False
+                )
 
-            if len(detections) == 0:
-                return []
-            corners = []
-            ids = []
-            for detection in detections:
-                corners.append(
-                    detection.corners[::-1]
-                )  # Reverse the order of corners. See MarkerDetector Abstract Class note.
-                ids.append(detection.tag_id)
+                if len(detections) == 0:
+                    return []
+                corners = []
+                ids = []
+                for detection in detections:
+                    corners.append(
+                        detection.corners[::-1]
+                    )  # Reverse the order of corners. See MarkerDetector Abstract Class note.
+                    ids.append(detection.tag_id)
+        except Exception as e:
+            raise MarkerDetectionError(f"AprilTag marker detection failed: {e}") from e
 
         detected_markers = []
 
@@ -526,13 +631,17 @@ class AprilTagMarkerDetector(MarkerDetector):
 
             if estimate_pose:
                 # SolvePnP
-                marker2cam: Transform = solve_pnp(
-                    swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
-                )
-                if marker2cam is None:
+                try:
+                    marker2cam: Transform = solve_pnp(
+                        swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
+                    )
+                    if marker2cam is None:
+                        continue
+                    # Build Marker object
+                    marker = Marker(marker_id, marker2cam, corner_2d)
+                except Exception as e:
+                    # If pose estimation fails, skip this marker
                     continue
-                # Build Marker object
-                marker = Marker(marker_id, marker2cam, corner_2d)
             else:
                 marker = Marker(id=marker_id, corners=corner_2d)
             detected_markers.append(marker)
@@ -573,14 +682,16 @@ class STagMarkerDetector(MarkerDetector):
             marker_type (FiducialMarkerType): The specific STag dictionary type to use.
 
         Raises:
-            ValueError: If the provided marker_type is not supported by STag.
+            InvalidMarkerTypeError: If the provided marker_type is not supported by STag.
         """
         super(STagMarkerDetector, self).__init__(cam, marker_size, marker_type)
 
         # Check if the provided marker_type is a valid dictionary for STag
         if marker_type not in self._VALID_APRILTAG_TYPES_HD:
-            raise ValueError(
-                f"{marker_type} is not a valid dictionary type stag supported."
+            raise InvalidMarkerTypeError(
+                f"Marker type {marker_type} is not supported by STag detector. "
+                f"Supported types: {list(self._VALID_APRILTAG_TYPES_HD.keys())}. "
+                f"Please use a valid STag marker dictionary type."
             )
 
         self._stag_hd = self._VALID_APRILTAG_TYPES_HD[marker_type]
@@ -598,14 +709,25 @@ class STagMarkerDetector(MarkerDetector):
         Returns:
             List[Marker]: A list of Marker objects with detected marker IDs, corner points,
                           and pose information (if pose estimation succeeded).
+                          
+        Raises:
+            IncompatibleTypeError: If image is not an array-like object.
+            MarkerDetectionError: If marker detection fails.
         """
-        assert is_array(
-            image
-        ), f"image must be ArrayLike(Numpy or Torch), but got {type(image)}."
+        if not is_array(image):
+            raise IncompatibleTypeError(
+                f"Image must be ArrayLike (numpy or torch), got {type(image)}. "
+                f"Please provide a valid image array."
+            )
 
         image = convert_numpy(image)
+        
         # Detect markers using STag
-        (corners, ids, _) = stag.detectMarkers(image, self._stag_hd)
+        try:
+            (corners, ids, _) = stag.detectMarkers(image, self._stag_hd)
+        except Exception as e:
+            raise MarkerDetectionError(f"STag marker detection failed: {e}") from e
+        
         # If no markers found, return an empty list
         if ids is None:
             return []
@@ -619,13 +741,17 @@ class STagMarkerDetector(MarkerDetector):
 
             if estimate_pose:
                 # Estimate pose using solvePnP
-                marker2cam: Transform = solve_pnp(
-                    swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
-                )
-                if marker2cam is None:
+                try:
+                    marker2cam: Transform = solve_pnp(
+                        swapaxes(corner_2d, 0, 1), swapaxes(self.corner_3d, 0, 1), self._cam
+                    )
+                    if marker2cam is None:
+                        continue
+                    # Create Marker object with pose
+                    marker = Marker(marker_id, marker2cam, corner_2d)
+                except Exception as e:
+                    # If pose estimation fails, skip this marker
                     continue
-                # Create Marker object with pose
-                marker = Marker(marker_id, marker2cam, corner_2d)
             else:
                 marker = Marker(id=marker_id, corners=corner_2d)
             detected_markers.append(marker)

@@ -34,6 +34,10 @@ from numpy import ndarray
 from torch import Tensor
 import torch
 
+from ..exceptions import (
+    IncompatibleTypeError, InvalidDimensionError, InvalidShapeError
+)
+
 ArrayLike = Union[ndarray, Tensor]  # Unified ArrayType
 
 
@@ -86,11 +90,15 @@ def convert_tensor(x: ArrayLike, tensor: Optional[Tensor] = None) -> Tensor:
 
     Returns:
         Tensor: The converted Torch tensor.
+        
+    Raises:
+        IncompatibleTypeError: If tensor parameter is not a Torch tensor.
     """
     if is_tensor(x):
         return x
     if tensor is not None:
-        assert is_tensor(tensor)
+        if not is_tensor(tensor):
+            raise IncompatibleTypeError("Expected tensor parameter to be a Torch tensor")
         x_tensor = torch.tensor(x, dtype=tensor.dtype, device=tensor.device)
     else:
         x_tensor = Tensor(x)
@@ -141,8 +149,12 @@ def numel(x: ArrayLike) -> int:
 
     Returns:
         int: The number of elements in the array.
+        
+    Raises:
+        IncompatibleTypeError: If input is not a numpy array or Torch tensor.
     """
-    assert is_array(x), "Invalid type. Input type must be either ndarray or Tensor."
+    if not is_array(x):
+        raise IncompatibleTypeError("Invalid type. Input type must be either ndarray or Tensor.")
     if is_tensor(x):
         return x.numel()
     return x.size
@@ -150,17 +162,16 @@ def numel(x: ArrayLike) -> int:
 
 def _assert_same_array_type(arrays: Tuple[ArrayLike, ...]):
     """
-    Asserts that all input arrays are of the same type.
+    Validates that all input arrays are of the same type.
 
     Args:
         arrays (Tuple[ArrayLike, ...]): A tuple of array-like objects.
 
     Raises:
-        AssertionError: If the input arrays are not of the same type.
+        IncompatibleTypeError: If the input arrays are not of the same type.
     """
-    assert all(is_tensor(arr) for arr in arrays) or all(
-        is_numpy(arr) for arr in arrays
-    ), "All input arrays must be of the same type"
+    if not (all(is_tensor(arr) for arr in arrays) or all(is_numpy(arr) for arr in arrays)):
+        raise IncompatibleTypeError("All input arrays must be of the same type")
 
 
 def convert_dict_tensor(
@@ -260,8 +271,12 @@ def ones_like(x: ArrayLike) -> ArrayLike:
 
     Returns:
         ArrayLike: An array of ones with the same shape and type as the input.
+        
+    Raises:
+        IncompatibleTypeError: If input is neither a numpy array nor a Torch tensor.
     """
-    assert is_array(x), "Invalid Type. It is neither Numpy nor Tensor."
+    if not is_array(x):
+        raise IncompatibleTypeError("Invalid Type. It is neither Numpy nor Tensor.")
     if is_tensor(x):
         return torch.ones_like(x)
     return np.ones_like(x)
@@ -412,11 +427,10 @@ def transpose2d(x: ArrayLike) -> ArrayLike:
         ArrayLike: The transposed array.
 
     Raises:
-        AssertionError: If the input array is not 2-D.
+        InvalidShapeError: If the input array is not 2-D.
     """
-    assert (
-        x.ndim == 2
-    ), f"Invalid shape for transpose: expected a 2D array, but got {x.shape}."
+    if x.ndim != 2:
+        raise InvalidShapeError(f"Invalid shape for transpose: expected a 2D array, but got {x.shape}.")
     if is_tensor(x):
         return x.transpose(0, 1)
     return x.T
@@ -464,6 +478,9 @@ def as_int(x: ArrayLike, n: int = 32) -> ArrayLike:
 
     Returns:
         ArrayLike: The array converted to integer type.
+        
+    Raises:
+        InvalidDimensionError: If the specified bit-width is not supported.
     """
     if is_tensor(x):
         if n == 64:
@@ -473,7 +490,7 @@ def as_int(x: ArrayLike, n: int = 32) -> ArrayLike:
         elif n == 16:
             return x.type(torch.int16)
         else:
-            raise ValueError(f"Unsupported bit-width {n} for int conversion.")
+            raise InvalidDimensionError(f"Unsupported bit-width {n} for int conversion.")
     elif is_numpy(x):
         if n == 256:
             return x.astype(np.int256)
@@ -486,7 +503,7 @@ def as_int(x: ArrayLike, n: int = 32) -> ArrayLike:
         elif n == 16:
             return x.astype(np.int16)
         else:
-            raise ValueError(f"Unsupported bit-width {n} for int conversion.")
+            raise InvalidDimensionError(f"Unsupported bit-width {n} for int conversion.")
 
 
 def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
@@ -499,6 +516,9 @@ def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
 
     Returns:
         ArrayLike: The array converted to float type.
+        
+    Raises:
+        InvalidDimensionError: If the specified bit-width is not supported.
     """
     if is_tensor(x):
         if n == 64:
@@ -508,7 +528,7 @@ def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
         elif n == 16:
             return x.type(torch.float16)
         else:
-            raise ValueError(f"Unsupported bit-width {n} for float conversion.")
+            raise InvalidDimensionError(f"Unsupported bit-width {n} for float conversion.")
     elif is_numpy(x):
         if n == 256:
             return x.astype(np.float256)
@@ -521,7 +541,7 @@ def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
         elif n == 16:
             return x.astype(np.float16)
         else:
-            raise ValueError(f"Unsupported bit-width {n} for float conversion.")
+            raise InvalidDimensionError(f"Unsupported bit-width {n} for float conversion.")
 
 
 def logical_or(*arrays: ArrayLike) -> ArrayLike:
@@ -533,8 +553,13 @@ def logical_or(*arrays: ArrayLike) -> ArrayLike:
 
     Returns:
         ArrayLike: The result of the logical OR operation.
+        
+    Raises:
+        InvalidDimensionError: If no input arrays are provided.
+        IncompatibleTypeError: If input arrays are not of the same type.
     """
-    assert len(arrays) > 0, "At least one input array is required"
+    if len(arrays) == 0:
+        raise InvalidDimensionError("At least one input array is required")
     _assert_same_array_type(arrays)
 
     result = arrays[0]
@@ -556,8 +581,13 @@ def logical_and(*arrays: ArrayLike) -> ArrayLike:
 
     Returns:
         ArrayLike: The result of the logical AND operation.
+        
+    Raises:
+        InvalidDimensionError: If fewer than two input arrays are provided.
+        IncompatibleTypeError: If input arrays are not of the same type.
     """
-    assert len(arrays) > 1, "At least one input array is required"
+    if len(arrays) <= 1:
+        raise InvalidDimensionError("At least two input arrays are required")
     _assert_same_array_type(arrays)
 
     result = arrays[0]
@@ -578,8 +608,12 @@ def logical_not(x: ArrayLike) -> ArrayLike:
 
     Returns:
         ArrayLike: The result of the logical NOT operation.
+        
+    Raises:
+        IncompatibleTypeError: If input is not a numpy array or Torch tensor.
     """
-    assert is_array(x)
+    if not is_array(x):
+        raise IncompatibleTypeError("Input must be a numpy array or Torch tensor")
     if is_tensor(x):
         return torch.logical_not(x)
     return np.logical_not(x)
@@ -594,8 +628,12 @@ def logical_xor(x: ArrayLike) -> ArrayLike:
 
     Returns:
         ArrayLike: The result of the logical XOR operation.
+        
+    Raises:
+        IncompatibleTypeError: If input is not a numpy array or Torch tensor.
     """
-    assert is_array(x)
+    if not is_array(x):
+        raise IncompatibleTypeError("Input must be a numpy array or Torch tensor")
     if is_tensor(x):
         return torch.logical_xor(x)
     return np.logical_xor(x)
@@ -615,10 +653,12 @@ def allclose(
 
     Returns:
         bool: True if the arrays are element-wise equal within the tolerance, False otherwise.
+        
+    Raises:
+        IncompatibleTypeError: If the input arrays are not of the same type.
     """
-    assert isinstance(
-        x, type(y)
-    ), f"Invalid type: expected same type for both arrays, but got {type(x)} and {type(y)}"
+    if not isinstance(x, type(y)):
+        raise IncompatibleTypeError(f"Invalid type: expected same type for both arrays, but got {type(x)} and {type(y)}")
     if is_tensor(x):
         return torch.allclose(x, y, rtol=rtol, atol=atol)
     return np.allclose(x, y, rtol=rtol, atol=atol)

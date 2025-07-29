@@ -22,6 +22,7 @@ Usage:
 from enum import Enum
 import numpy as np
 from cv_utils.geom import Transform
+from ...exceptions import InvalidMarkerTypeError, InvalidShapeError
 
 
 class FiducialMarkerType(Enum):
@@ -109,10 +110,18 @@ class Marker:
     ):
         """
         Initializes the Marker instance.
+        
+        Args:
+            id (int): Marker ID. Defaults to -1.
+            marker2cam (Transform): Transform from marker to camera coordinates.
+            corners (np.ndarray): 2D corner points with shape (4, 2).
+            
+        Raises:
+            InvalidShapeError: If corners array doesn't have the correct shape (4, 2).
         """
-        self._id = id
-        self._marker2cam = marker2cam
-        self._corners = corners
+        self.id = id  # Use setter for validation
+        self.marker2cam = marker2cam  # Use setter for validation
+        self.corners = corners  # Use setter for validation
 
     @property
     def id(self):
@@ -131,7 +140,20 @@ class Marker:
 
         Args:
             new_id (int): The ID to be assigned to this marker.
+            
+        Raises:
+            InvalidMarkerTypeError: If ID is not a valid integer or is negative.
         """
+        if not isinstance(new_id, int):
+            raise InvalidMarkerTypeError(
+                f"Marker ID must be an integer, got {type(new_id)}. "
+                f"Please provide a valid integer ID."
+            )
+        if new_id < -1:
+            raise InvalidMarkerTypeError(
+                f"Marker ID must be -1 (uninitialized) or positive, got {new_id}. "
+                f"Please provide a valid marker ID."
+            )
         self._id = new_id
 
     @property
@@ -151,7 +173,15 @@ class Marker:
 
         Args:
             new_pose (Transform): The new transform of this marker in camera coordinates.
+            
+        Raises:
+            InvalidMarkerTypeError: If new_pose is not a Transform object.
         """
+        if not isinstance(new_pose, Transform):
+            raise InvalidMarkerTypeError(
+                f"Marker pose must be a Transform object, got {type(new_pose)}. "
+                f"Please provide a valid Transform instance."
+            )
         self._marker2cam = new_pose
 
     @property
@@ -180,10 +210,25 @@ class Marker:
             new_corners (np.ndarray): A (4, 2) array representing the pixel coordinates
                                       of each corner.
 
+        Raises:
+            InvalidShapeError: If corners array doesn't have the correct shape (4, 2).
+
         Details:
             - Ensure the shape is (4, 2) and the ordering matches your pose estimation
               pipeline (e.g., clockwise or counter-clockwise).
             - The recommended convention is top-left -> top-right -> bottom-right ->
               bottom-left for clarity.
         """
+        if not isinstance(new_corners, np.ndarray):
+            raise InvalidShapeError(
+                f"Marker corners must be a numpy array, got {type(new_corners)}. "
+                f"Please provide a valid numpy array with shape (4, 2)."
+            )
+        
+        if new_corners.shape != (4, 2):
+            raise InvalidShapeError(
+                f"Marker corners must have shape (4, 2), got {new_corners.shape}. "
+                f"Please provide exactly 4 corner points with 2D coordinates (x, y)."
+            )
+        
         self._corners = new_corners

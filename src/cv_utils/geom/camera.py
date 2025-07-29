@@ -31,7 +31,15 @@ from ..ops.uops import *
 from ..ops.umath import *
 
 from ..common.constant import PI, NORM_PIXEL_THRESHOLD, EPSILON
-from ..common.logger import LOG_CRITICAL, LOG_ERROR, LOG_WARN
+from ..common.logger import LOG_CRITICAL, LOG_WARN
+from ..exceptions import (
+    InvalidCameraParameterError, 
+    UnsupportedCameraTypeError,
+    CameraModelError,
+    InvalidShapeError,
+    InvalidDimensionError,
+    ConversionError
+)
 
 
 class CamType(Enum):
@@ -111,9 +119,19 @@ class Camera:
         return uv
 
     def set_mask(self, mask: ArrayLike):
+        """
+        Sets a mask for the camera.
+        
+        Args:
+            mask (ArrayLike): Boolean mask array.
+            
+        Raises:
+            InvalidShapeError: If mask shape doesn't match image size.
+        """
         if mask.shape != self.hw:
-            LOG_ERROR(
-                f"Mask's shape must be same as image size{self.hw}, but Mask's shape = {mask.shape}."
+            raise InvalidShapeError(
+                f"Mask shape {mask.shape} must match image size {self.hw}. "
+                f"Please ensure the mask has the same dimensions as the camera image."
             )
         mask = convert_numpy(mask).reshape(
             -1,
@@ -481,12 +499,26 @@ class RadialCamera(Camera):
         return uv if out_subpixel else as_int(uv, n=32)  # (2,HW)
 
     def undistort_image(self, image: np.ndarray) -> np.ndarray:
+        """
+        Undistorts an input image using camera parameters.
+        
+        Args:
+            image (np.ndarray): Input image to undistort.
+            
+        Returns:
+            np.ndarray: Undistorted image.
+            
+        Raises:
+            InvalidShapeError: If image resolution doesn't match camera resolution.
+        """
         if self.hw != image.shape[0:2]:
-            LOG_CRITICAL("Image's resolution must be same as camera's resolution.")
-            raise ValueError
+            raise InvalidShapeError(
+                f"Image resolution {image.shape[0:2]} must match camera resolution {self.hw}. "
+                f"Please ensure the input image has the same dimensions as the camera."
+            )
 
         if self.has_distortion() is False:
-            LOG_WARN("There is no distortion, thus the output image unchanged.")
+            LOG_WARN("No distortion parameters found, returning image unchanged.")
             return image
 
         uv = self.distort_pixel(self.make_pixel_grid(), out_subpixel=True)
@@ -494,12 +526,26 @@ class RadialCamera(Camera):
         return output_image
 
     def distort_image(self, image: np.ndarray) -> np.ndarray:
+        """
+        Distorts an input image using camera parameters.
+        
+        Args:
+            image (np.ndarray): Input image to distort.
+            
+        Returns:
+            np.ndarray: Distorted image.
+            
+        Raises:
+            InvalidShapeError: If image resolution doesn't match camera resolution.
+        """
         if self.hw != image.shape[0:2]:
-            LOG_CRITICAL("Image's resolution must be same as camera's resolution.")
-            raise ValueError
+            raise InvalidShapeError(
+                f"Image resolution {image.shape[0:2]} must match camera resolution {self.hw}. "
+                f"Please ensure the input image has the same dimensions as the camera."
+            )
 
         if self.has_distortion() is False:
-            LOG_WARN("There is no distortion, thus the output image unchanged.")
+            LOG_WARN("No distortion parameters found, returning image unchanged.")
             return image
 
         uv = self.undistort_pixel(self.make_pixel_grid(), out_subpixel=True)
@@ -877,8 +923,15 @@ class ThinPrismFisheyeCamera(RadialCamera):
 
         Returns:
             ThinPrismFisheyeCamera: An instance of ThinPrismFisheyeCamera with given parameters.
+            
+        Raises:
+            InvalidCameraParameterError: If distortion parameters are invalid.
         """
-        assert len(D) == 8, "Distortion parameters must be consist of 8"
+        if len(D) != 8:
+            raise InvalidCameraParameterError(
+                f"ThinPrism camera requires exactly 8 distortion parameters, got {len(D)}. "
+                f"Expected parameters: [k1, k2, p1, p2, k3, k4, sx1, sy1]."
+            )
 
         cam_dict = {
             "image_size": image_size,  # width and height
@@ -901,8 +954,15 @@ class ThinPrismFisheyeCamera(RadialCamera):
 
         Returns:
             ThinPrismFisheyeCamera: An instance of ThinPrismFisheyeCamera with given parameters.
+            
+        Raises:
+            InvalidCameraParameterError: If parameter count is invalid.
         """
-        assert len(params) == 12, "params must be 12."
+        if len(params) != 12:
+            raise InvalidCameraParameterError(
+                f"ThinPrism camera requires exactly 12 parameters, got {len(params)}. "
+                f"Expected: [fx, fy, cx, cy, k1, k2, p1, p2, k3, k4, sx1, sy1]."
+            )
 
         cam_dict = {
             "image_size": image_size,  # width and height
@@ -1029,13 +1089,26 @@ class OmnidirectionalCamera(Camera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
+        """
+        Initialize OmnidirectionalCamera.
+        
+        Args:
+            cam_dict (Dict[str, Any]): Camera parameter dictionary.
+            
+        Raises:
+            InvalidCameraParameterError: If FOV parameter is invalid.
+        """
         super().__init__(cam_dict)
         self.cam_type = CamType.OMNIDIRECT
         self.cx, self.cy = cam_dict["distortion_center"]
         self.poly_coeffs = np.array(cam_dict["poly_coeffs"])
         self.inv_poly_coeffs = np.array(cam_dict["inv_poly_coeffs"])
         self._affine = cam_dict.get("affine", [1.0, 0.0, 0.0])  # c,d,e
-        assert self._max_fov_deg > 0, "FOV must be positive."
+        if self._max_fov_deg <= 0:
+            raise InvalidCameraParameterError(
+                f"Field of view must be positive, got {self._max_fov_deg} degrees. "
+                f"Please provide a valid FOV value greater than 0."
+            )
         fov_mask = self._compute_fov_mask()  # maximum fov mask
         self._mask = logical_and(fov_mask, self._mask)
 
@@ -1139,6 +1212,15 @@ class DoubleSphereCamera(Camera):
     """
 
     def __init__(self, cam_dict: Dict[str, Any]):
+        """
+        Initialize DoubleSphereCamera.
+        
+        Args:
+            cam_dict (Dict[str, Any]): Camera parameter dictionary.
+            
+        Raises:
+            InvalidCameraParameterError: If FOV parameter is invalid.
+        """
         super().__init__(cam_dict)
         self.cam_type = CamType.DOUBLESPHERE
         self.cx, self.cy = cam_dict["principal_point"]
@@ -1146,7 +1228,11 @@ class DoubleSphereCamera(Camera):
         self.xi = cam_dict["xi"]
         self.alpha = cam_dict["alpha"]
 
-        assert self._max_fov_deg > 0, "FOV must be positive."
+        if self._max_fov_deg <= 0:
+            raise InvalidCameraParameterError(
+                f"Field of view must be positive, got {self._max_fov_deg} degrees. "
+                f"Please provide a valid FOV value greater than 0."
+            )
         self.fov_cos = cos(deg2rad(self._max_fov_deg / 2.0))
 
     def export_cam_dict(self) -> Dict[str, Any]:

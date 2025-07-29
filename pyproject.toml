@@ -26,7 +26,7 @@ classifiers = [
 
 dependencies = [
     "numpy",
-    "opencv-python", 
+    "opencv-python",
     "torch>=2.1.0",
     "scipy",
     "matplotlib",
