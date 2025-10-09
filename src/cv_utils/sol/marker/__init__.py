@@ -1,2 +1,11 @@
 from .marker import Marker, FiducialMarkerType
-from .detector import OpenCVMarkerDetector, AprilTagMarkerDetector, STagMarkerDetector
+from .detector import MarkerDetector, OpenCVMarkerDetector, AprilTagMarkerDetector, STagMarkerDetector
+
+__all__ = [
+    "Marker",
+    "FiducialMarkerType",
+    "MarkerDetector",
+    "OpenCVMarkerDetector",
+    "AprilTagMarkerDetector",
+    "STagMarkerDetector",
+]

@@ -1,7 +1,10 @@
 import unittest
 import numpy as np
 from scipy.spatial.transform import Rotation as SciPyRotation
-from cv_utils.geom.rotation import *
+
+# Use new hierarchical import pattern
+from cv_utils import Rotation, RotType
+from cv_utils.geom.rotation import is_SO3, slerp
 
 class TestRotation(unittest.TestCase):
 
@@ -12,11 +15,13 @@ class TestRotation(unittest.TestCase):
 
     def test_rotation_from_quat_xyzw(self):
         quat = np.array([0.707, 0, 0, 0.707])
+        quat = quat / np.linalg.norm(quat)  # Normalize to unit quaternion
         rotation = Rotation.from_quat_xyzw(quat)
         self.assertTrue(is_SO3(rotation.mat()))
 
     def test_rotation_from_quat_wxyz(self):
         quat = np.array([0.707, 0, 0, 0.707])
+        quat = quat / np.linalg.norm(quat)  # Normalize to unit quaternion
         rotation = Rotation.from_quat_wxyz(quat)
         self.assertTrue(is_SO3(rotation.mat()))
 
@@ -26,10 +31,13 @@ class TestRotation(unittest.TestCase):
         self.assertTrue(is_SO3(rotation.mat()))
 
     def test_quat_to_SO3_and_back(self):
-        quat = np.array([0.707, 0, 0, 0.707])
-        rotation = Rotation.from_quat_xyzw(quat)
-        quat_back = rotation.quat()
-        np.testing.assert_almost_equal(quat, quat_back, decimal=5)
+        quat_xyzw = np.array([0.707, 0, 0, 0.707])
+        quat_xyzw = quat_xyzw / np.linalg.norm(quat_xyzw)  # Normalize to unit quaternion
+        rotation = Rotation.from_quat_xyzw(quat_xyzw)
+        quat_wxyz_back = rotation.quat()  # Returns wxyz format
+        # Convert xyzw to wxyz for comparison
+        quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+        np.testing.assert_almost_equal(quat_wxyz, quat_wxyz_back, decimal=5)
 
     def test_rpy_to_SO3_and_back(self):
         rpy = np.array([0.1, 0.2, 0.3])
@@ -73,10 +81,12 @@ class TestRotation(unittest.TestCase):
         np.testing.assert_almost_equal(rotation.rpy(), scipy_rotation.as_euler('xyz'), decimal=5)
         
         # Test Quaternion to SO3 and back
-        quat = scipy_rotation.as_quat() # SciPy uses [x, y, z, w]
-        rotation = Rotation.from_quat_xyzw(quat)
+        quat_xyzw = scipy_rotation.as_quat() # SciPy uses [x, y, z, w]
+        rotation = Rotation.from_quat_xyzw(quat_xyzw)
         np.testing.assert_almost_equal(rotation.mat(), scipy_rotation.as_matrix(), decimal=5)
-        np.testing.assert_almost_equal(rotation.quat(), quat, decimal=5)
+        # Convert xyzw to wxyz for comparison with rotation.quat()
+        quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+        np.testing.assert_almost_equal(rotation.quat(), quat_wxyz, decimal=5)
 
         # Test SO3 to so3 and back
         so3 = scipy_rotation.as_rotvec()
@@ -92,10 +102,16 @@ class TestRotation(unittest.TestCase):
             np.testing.assert_almost_equal(rotation.mat(), scipy_rotation.as_matrix(), decimal=5)
             np.testing.assert_almost_equal(rotation.rpy(), scipy_rotation.as_euler('xyz'), decimal=5)
             
-            quat = scipy_rotation.as_quat()
-            rotation = Rotation.from_quat_xyzw(quat)
+            quat_xyzw = scipy_rotation.as_quat()
+            rotation = Rotation.from_quat_xyzw(quat_xyzw)
             np.testing.assert_almost_equal(rotation.mat(), scipy_rotation.as_matrix(), decimal=5)
-            np.testing.assert_almost_equal(rotation.quat(), quat, decimal=5)
+            # Convert xyzw to wxyz for comparison with rotation.quat()
+            quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+            # Handle quaternion sign ambiguity: both q and -q represent the same rotation
+            quat_back = rotation.quat()
+            if np.dot(quat_back, quat_wxyz) < 0:
+                quat_wxyz = -quat_wxyz
+            np.testing.assert_almost_equal(quat_back, quat_wxyz, decimal=5)
 
             so3 = scipy_rotation.as_rotvec()
             rotation = Rotation.from_so3(so3)

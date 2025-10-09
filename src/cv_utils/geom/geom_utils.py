@@ -27,6 +27,8 @@ import cv2 as cv
 
 import numpy as np
 from ..ops.uops import *
+from ..ops.umath import inv, svd, dehomo, determinant, norm, sqrt
+from ..common.constant import EPSILON
 from .pose import Pose
 from .rotation import Rotation
 from .tf import Transform
@@ -682,7 +684,7 @@ def convert_depth_to_point_cloud(
     elif map_type == "MSI":
         pts3d = rays * depth
     elif map_type == "MCI":
-        r = sqrt(rays[0, :] ** 2 + rays[2, :] ** 2).reshape(-1, 1)
+        r = sqrt(rays[0, :] ** 2 + rays[2, :] ** 2).reshape(1, -1)
         mask = logical_and(
             mask,
             (r != 0.0).reshape(

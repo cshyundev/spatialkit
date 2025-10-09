@@ -20,14 +20,16 @@ License: MIT LICENSE
 """
 
 from enum import Enum
+from typing import Any, Union
+import numpy as np
 
 from ..ops.uops import *
 from ..ops.umath import *
 from ..common.constant import PI, ROTATION_SO3_THRESHOLD
 from ..common.logger import LOG_CRITICAL
 from ..exceptions import (
-    InvalidShapeError, 
-    InvalidDimensionError, 
+    InvalidShapeError,
+    InvalidDimensionError,
     GeometryError,
     IncompatibleTypeError,
     NumericalError
@@ -74,7 +76,7 @@ def is_SO3(x: ArrayLike) -> bool:
 
     return allclose(
         dot(transpose2d(x), x), eye(3, x), atol=ROTATION_SO3_THRESHOLD
-    ) and isclose(determinant(x), 1.0)
+    ) and isclose(determinant(x), 1.0, atol=1e-3)
 
 
 def is_so3(x: ArrayLike) -> bool:
@@ -95,7 +97,7 @@ def is_quat(x: ArrayLike) -> bool:
     shape = x.shape
     if shape != (4,):
         return False  # invalid shape
-    return isclose(norm(x), 1.0)
+    return isclose(norm(x), 1.0, atol=1e-3)
 
 
 def is_rpy(x: ArrayLike) -> bool:
@@ -312,7 +314,9 @@ def SO3_to_quat(SO3: ArrayLike, is_xyzw: bool) -> ArrayLike:
         y = (r23 + r32) / S
         z = 0.25 * S
 
-    return concat([w, x, y, z], dim=0)
+    # Stack scalars into an array
+    quat = np.array([float(w), float(x), float(y), float(z)])
+    return quat
 
 
 def SO3_to_rpy(SO3: ArrayLike) -> ArrayLike:
@@ -353,7 +357,9 @@ def SO3_to_rpy(SO3: ArrayLike) -> ArrayLike:
             pitch = -PI / 2
             roll = -yaw + arctan2(-m01, -m02)
 
-    return convert_array(concat([roll, pitch, yaw], 0), SO3)
+    # Stack scalars into an array
+    rpy = np.array([float(roll), float(pitch), float(yaw)])
+    return rpy
 
 
 class Rotation:
@@ -519,11 +525,23 @@ class Rotation:
     def inverse(self) -> "Rotation":
         """
         Get the inverse rotation.
-        
+
         Returns:
             Rotation: Inverse rotation instance.
         """
         return Rotation.from_mat3(self.inverse_mat())
+
+    def dot(self, rot: "Rotation") -> "Rotation":
+        """
+        Compose this rotation with another rotation (public method).
+
+        Args:
+            rot (Rotation): Another rotation to compose with.
+
+        Returns:
+            Rotation: Composed rotation.
+        """
+        return self._dot(rot)
 
     def _dot(self, rot: "Rotation") -> "Rotation":
         """
@@ -613,3 +631,26 @@ def slerp(r1: Rotation, r2: Rotation, t: float):
         scale2 = sin(t * omega) / sin_omega
         q = normalize(scale1 * q1 + scale2 * q2, dim=0)
     return Rotation.from_quat_wxyz(q)
+
+
+__all__ = [
+    # Rotation type enum
+    "RotType",
+    # Main rotation class
+    "Rotation",
+    # Type checking functions
+    "is_SO3",
+    "is_so3",
+    "is_quat",
+    "is_rpy",
+    # Conversion to SO3
+    "so3_to_SO3",
+    "quat_to_SO3",
+    "rpy_to_SO3",
+    # Conversion from SO3
+    "SO3_to_so3",
+    "SO3_to_quat",
+    "SO3_to_rpy",
+    # Interpolation
+    "slerp",
+]

@@ -17,7 +17,9 @@ Version: 0.2.0-alpha
 License: MIT LICENSE
 """
 
+from typing import Optional, Tuple
 import numpy as np
+
 from .rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
 from ..ops.uops import *
 from ..ops.umath import *

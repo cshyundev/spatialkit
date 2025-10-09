@@ -25,7 +25,9 @@ Usage:
 tensor(2.5000)
 """
 
+from typing import Optional, Union, Tuple, List
 from scipy.linalg import expm
+import numpy as np
 import torch
 
 from .uops import *
@@ -746,3 +748,48 @@ def dehomo(x: ArrayLike) -> ArrayLike:
     
     euc_coords = x[:-1, :] / x[-1, :]
     return euc_coords
+
+
+__all__ = [
+    # Basic math operations
+    "abs",
+    "sqrt",
+    "mean",
+    "dot",
+    # Linear algebra decompositions
+    "qr",
+    "svd",
+    # Matrix operations
+    "determinant",
+    "inv",
+    "norm",
+    "normalize",
+    "matmul",
+    "permute",
+    "trace",
+    "diag",
+    # Trigonometric functions
+    "sin",
+    "cos",
+    "tan",
+    "arcsin",
+    "arccos",
+    "arctan",
+    "arctan2",
+    # Unit conversion
+    "rad2deg",
+    "deg2rad",
+    # Matrix exponential
+    "exponential_map",
+    # Polynomial functions
+    "polyval",
+    "polyfit",
+    # Linear systems
+    "is_square",
+    "solve",
+    "solve_linear_system",
+    # Computer vision helpers
+    "vec3_to_skew",
+    "homo",
+    "dehomo",
+]

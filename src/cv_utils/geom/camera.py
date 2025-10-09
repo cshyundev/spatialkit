@@ -262,7 +262,11 @@ class Camera:
         mask_indices = as_int(valid_uv[1]) * self.width + as_int(valid_uv[0])  # (N,)
 
         mask = convert_array(self._mask, uv)
-        valid_mask[is_in_image_indices] = mask[mask_indices]
+        # Ensure mask values are properly cast to boolean type
+        mask_values = mask[mask_indices]
+        if is_tensor(mask_values):
+            mask_values = mask_values.bool()
+        valid_mask[is_in_image_indices] = mask_values
 
         return valid_mask
 
@@ -1150,10 +1154,11 @@ class OmnidirectionalCamera(Camera):
         rays = normalize(rays, dim=0)
 
         if z_fixed:
-            valid = z != 0
+            valid = (z != 0).reshape(-1,)
             mask = mask & valid
 
-            rays[:, valid] = rays[:, valid] / z[valid]
+            # Only divide where z is non-zero
+            rays[:, valid] = rays[:, valid] / z[:, valid]
             rays[:, ~valid] = 0.0
         else:
             rays = normalize(rays, dim=0)
@@ -1277,7 +1282,7 @@ class DoubleSphereCamera(Camera):
         fov_mask = self._compute_fov_mask(Z)
 
         if z_fixed:
-            valid_z: ArrayLike = Z != 0
+            valid_z: ArrayLike = (Z != 0).reshape(-1,)
             mask = logical_and(
                 mask,
                 fov_mask.reshape(
@@ -1286,11 +1291,10 @@ class DoubleSphereCamera(Camera):
                 valid_mask.reshape(
                     -1,
                 ),
-                valid_z.reshape(
-                    -1,
-                ),
+                valid_z,
             )
-            rays[:, valid_z] = rays[:, valid_z] / Z[valid_z]
+            # Only divide where Z is non-zero
+            rays[:, valid_z] = rays[:, valid_z] / Z[:, valid_z]
             rays[:, logical_not(valid_z)] = 0.0
         else:
             mask = logical_and(
@@ -1433,3 +1437,16 @@ class EquirectangularCamera(Camera):
         mask = self._extract_mask(uv)
         uv = uv if out_subpixel else as_int(uv, n=32)
         return uv, mask
+
+
+__all__ = [
+    "CamType",
+    "Camera",
+    "RadialCamera",
+    "PerspectiveCamera",
+    "OpenCVFisheyeCamera",
+    "ThinPrismFisheyeCamera",
+    "OmnidirectionalCamera",
+    "DoubleSphereCamera",
+    "EquirectangularCamera",
+]
