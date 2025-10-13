@@ -66,7 +66,9 @@ class Transform:
 
         t = t.reshape(1, 3)
 
-        self._t = t
+        # Convert to numpy and enforce float32 for consistent precision and memory efficiency
+        from ..ops.uops import convert_numpy
+        self._t = convert_numpy(t).astype(np.float32)
         self._rot = rot
 
     @property

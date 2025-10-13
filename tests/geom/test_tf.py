@@ -178,8 +178,9 @@ class TestTransformMethods(unittest.TestCase):
 
         self.assertEqual(rot_mat.shape, (3, 3))
         self.assertTrue(np.allclose(rot_mat, self.rot1.mat()))
-        # Verify it's orthogonal
-        self.assertTrue(np.allclose(rot_mat @ rot_mat.T, np.eye(3)))
+        # Verify it's orthogonal (use float32 precision tolerance)
+        identity = np.eye(3, dtype=rot_mat.dtype)
+        self.assertTrue(np.allclose(rot_mat @ rot_mat.T, identity, atol=1e-6))
 
     def test_mat34(self):
         """Test getting 3x4 transformation matrix."""
@@ -563,6 +564,20 @@ class TestTransformEdgeCases(unittest.TestCase):
         double_inverse = transform.inverse().inverse()
 
         self.assertTrue(np.allclose(double_inverse.mat44(), transform.mat44(), atol=1e-10))
+
+    def test_transform_float32_storage(self):
+        """Test that Transform stores data as float32 regardless of input dtype."""
+        # Test with float64 input
+        t_f64 = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        rot = Rotation.from_mat3(np.eye(3, dtype=np.float64))
+        tf = Transform(t_f64, rot)
+        self.assertEqual(tf._t.dtype, np.float32)
+        self.assertEqual(tf.rot.data.dtype, np.float32)
+
+        # Test with float32 input
+        t_f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        tf_f32 = Transform(t_f32, Rotation.from_mat3(np.eye(3, dtype=np.float32)))
+        self.assertEqual(tf_f32._t.dtype, np.float32)
 
 
 if __name__ == '__main__':

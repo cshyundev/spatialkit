@@ -401,5 +401,91 @@ class TestHybridOperations(unittest.TestCase):
         with self.assertRaises(cv_utils.InvalidDimensionError):
             uops.logical_and(self.numpy_array)
 
+
+class TestDtypeUtilities(unittest.TestCase):
+    """Test dtype utility functions."""
+
+    def test_get_dtype_numpy(self):
+        """Test get_dtype with numpy arrays."""
+        arr_f32 = np.array([1.0], dtype=np.float32)
+        arr_f64 = np.array([1.0], dtype=np.float64)
+        arr_i32 = np.array([1], dtype=np.int32)
+
+        self.assertEqual(uops.get_dtype(arr_f32), np.float32)
+        self.assertEqual(uops.get_dtype(arr_f64), np.float64)
+        self.assertEqual(uops.get_dtype(arr_i32), np.int32)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_get_dtype_torch(self):
+        """Test get_dtype with torch tensors."""
+        tensor_f32 = torch.tensor([1.0], dtype=torch.float32)
+        tensor_f64 = torch.tensor([1.0], dtype=torch.float64)
+
+        self.assertEqual(uops.get_dtype(tensor_f32), torch.float32)
+        self.assertEqual(uops.get_dtype(tensor_f64), torch.float64)
+
+    def test_get_dtype_error(self):
+        """Test get_dtype with invalid input."""
+        with self.assertRaises(cv_utils.IncompatibleTypeError):
+            uops.get_dtype([1, 2, 3])
+
+    def test_promote_types_numpy(self):
+        """Test dtype promotion for numpy arrays."""
+        arr_f32 = np.array([1.0], dtype=np.float32)
+        arr_f64 = np.array([2.0], dtype=np.float64)
+        arr_i32 = np.array([3], dtype=np.int32)
+
+        # float32 + float64 → float64
+        promoted = uops.promote_types(arr_f32, arr_f64)
+        self.assertEqual(promoted, np.float64)
+
+        # int32 + float64 → float64
+        promoted = uops.promote_types(arr_i32, arr_f64)
+        self.assertEqual(promoted, np.float64)
+
+        # float64 + float32 + int32 → float64
+        promoted = uops.promote_types(arr_f64, arr_f32, arr_i32)
+        self.assertEqual(promoted, np.float64)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_promote_types_torch(self):
+        """Test dtype promotion for torch tensors."""
+        tensor_f32 = torch.tensor([1.0], dtype=torch.float32)
+        tensor_f64 = torch.tensor([2.0], dtype=torch.float64)
+
+        promoted = uops.promote_types(tensor_f32, tensor_f64)
+        self.assertEqual(promoted, torch.float64)
+
+    def test_promote_types_usage(self):
+        """Test using promoted dtype for conversion."""
+        arr_f32 = np.array([1.0], dtype=np.float32)
+        arr_f64 = np.array([2.0], dtype=np.float64)
+
+        promoted = uops.promote_types(arr_f32, arr_f64)
+        result = arr_f32.astype(promoted)
+
+        self.assertEqual(result.dtype, np.float64)
+
+    def test_promote_types_no_arrays(self):
+        """Test promote_types with no arrays."""
+        with self.assertRaises(cv_utils.InvalidDimensionError):
+            uops.promote_types()
+
+    def test_promote_types_invalid_input(self):
+        """Test promote_types with non-array input."""
+        arr = np.array([1.0])
+        with self.assertRaises(cv_utils.IncompatibleTypeError):
+            uops.promote_types(arr, [1, 2, 3])
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_promote_types_mixed_types_error(self):
+        """Test that mixing numpy and tensor raises error."""
+        arr_np = np.array([1.0])
+        arr_torch = torch.tensor([2.0])
+
+        with self.assertRaises(cv_utils.IncompatibleTypeError):
+            uops.promote_types(arr_np, arr_torch)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -113,5 +113,19 @@ class TestPose(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(identity_mat, np.eye(4), decimal=5)
 
+    def test_pose_float32_storage(self):
+        """Test that Pose stores data as float32 regardless of input dtype."""
+        # Test with float64 input
+        t_f64 = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        rot = Rotation.from_mat3(np.eye(3, dtype=np.float64))
+        pose = Pose(t_f64, rot)
+        self.assertEqual(pose._t.dtype, np.float32)
+        self.assertEqual(pose.rot.data.dtype, np.float32)
+
+        # Test with float32 input
+        t_f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        pose_f32 = Pose(t_f32, Rotation.from_mat3(np.eye(3, dtype=np.float32)))
+        self.assertEqual(pose_f32._t.dtype, np.float32)
+
 if __name__ == '__main__':
     unittest.main()

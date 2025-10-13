@@ -1,7 +1,12 @@
 import numpy as np
-import torch
 import unittest
 from scipy.linalg import expm
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 # Use new hierarchical import pattern
 import cv_utils
@@ -417,6 +422,113 @@ class TestHybridMath(unittest.TestCase):
         y_torch = torch.tensor([1.0, 3.0, 5.0, 7.0])
         result_torch = umath.polyfit(x_torch, y_torch, 1)
         self.assertTrue(torch.is_tensor(result_torch))
+
+
+class TestUmathDtypePromotion(unittest.TestCase):
+    """Test dtype promotion for multi-input functions in umath."""
+
+    def test_dot_mixed_dtype(self):
+        """Test dot product with mixed float32/float64."""
+        x_f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        y_f64 = np.array([4.0, 5.0, 6.0], dtype=np.float64)
+
+        result = umath.dot(x_f32, y_f64)
+
+        # Result should be in promoted dtype (float64)
+        self.assertEqual(result.dtype, np.float64)
+        np.testing.assert_almost_equal(result, 32.0)
+
+    def test_dot_same_dtype(self):
+        """Test dot product with same dtype (should preserve)."""
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        y = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+
+        result = umath.dot(x, y)
+
+        self.assertEqual(result.dtype, np.float32)
+
+    def test_matmul_mixed_dtype(self):
+        """Test matrix multiplication with mixed float32/float64."""
+        A_f32 = np.array([[1, 2], [3, 4]], dtype=np.float32)
+        B_f64 = np.array([[5, 6], [7, 8]], dtype=np.float64)
+
+        result = umath.matmul(A_f32, B_f64)
+
+        # Result should be in promoted dtype (float64)
+        self.assertEqual(result.dtype, np.float64)
+        expected = np.array([[19, 22], [43, 50]], dtype=np.float64)
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_matmul_int_float_promotion(self):
+        """Test matrix multiplication with int32 + float32 promotion."""
+        A_i32 = np.array([[1, 2], [3, 4]], dtype=np.int32)
+        B_f32 = np.array([[5, 6], [7, 8]], dtype=np.float32)
+
+        result = umath.matmul(A_i32, B_f32)
+
+        # Result should be in promoted dtype (float64, as per numpy promotion rules)
+        self.assertEqual(result.dtype, np.float64)
+
+    def test_arctan2_mixed_dtype(self):
+        """Test arctan2 with mixed float32/float64."""
+        x_f32 = np.array([1.0, 2.0], dtype=np.float32)
+        y_f64 = np.array([3.0, 4.0], dtype=np.float64)
+
+        result = umath.arctan2(x_f32, y_f64)
+
+        # Result should be in promoted dtype (float64)
+        self.assertEqual(result.dtype, np.float64)
+
+    def test_arctan2_same_dtype(self):
+        """Test arctan2 with same dtype."""
+        x = np.array([1.0, 2.0], dtype=np.float32)
+        y = np.array([3.0, 4.0], dtype=np.float32)
+
+        result = umath.arctan2(x, y)
+
+        self.assertEqual(result.dtype, np.float32)
+
+    def test_solve_mixed_dtype(self):
+        """Test linear system solve with mixed float32/float64."""
+        A_f32 = np.array([[3.0, 1.0], [1.0, 2.0]], dtype=np.float32)
+        b_f64 = np.array([9.0, 8.0], dtype=np.float64)
+
+        result = umath.solve(A_f32, b_f64)
+
+        # Result should be in promoted dtype (float64)
+        self.assertEqual(result.dtype, np.float64)
+        # Verify solution: 3x + y = 9, x + 2y = 8 => x=2, y=3
+        np.testing.assert_array_almost_equal(result, [2.0, 3.0])
+
+    def test_solve_same_dtype(self):
+        """Test linear system solve with same dtype."""
+        A = np.array([[3.0, 1.0], [1.0, 2.0]], dtype=np.float32)
+        b = np.array([9.0, 8.0], dtype=np.float32)
+
+        result = umath.solve(A, b)
+
+        self.assertEqual(result.dtype, np.float32)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_dot_tensor_mixed_dtype(self):
+        """Test dot product with torch tensors and mixed dtype."""
+        x_f32 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
+        y_f64 = torch.tensor([4.0, 5.0, 6.0], dtype=torch.float64)
+
+        result = umath.dot(x_f32, y_f64)
+
+        self.assertEqual(result.dtype, torch.float64)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_matmul_tensor_mixed_dtype(self):
+        """Test matmul with torch tensors and mixed dtype."""
+        A_f32 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
+        B_f64 = torch.tensor([[5, 6], [7, 8]], dtype=torch.float64)
+
+        result = umath.matmul(A_f32, B_f64)
+
+        self.assertEqual(result.dtype, torch.float64)
+
 
 if __name__ == '__main__':
     unittest.main()

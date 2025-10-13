@@ -259,7 +259,7 @@ class Camera:
         valid_uv = uv[:, within_image_bounds]
         if valid_uv.size == 0:
             return valid_mask
-        mask_indices = as_int(valid_uv[1]) * self.width + as_int(valid_uv[0])  # (N,)
+        mask_indices = as_int(valid_uv[1], n=32) * self.width + as_int(valid_uv[0], n=32)  # (N,)
 
         mask = convert_array(self._mask, uv)
         # Ensure mask values are properly cast to boolean type

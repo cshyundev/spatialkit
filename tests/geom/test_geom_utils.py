@@ -536,6 +536,139 @@ class TestGeomUtils(unittest.TestCase):
         self.assertEqual(recover_pts3d.shape[0], 3)
         self.assertGreater(recover_pts3d.shape[1], 0)
 
+    def test_compute_relative_transform_from_points_float32(self):
+        """Test relative transform with float32 input to verify cv.recoverPose compatibility."""
+        # Convert points to float32 (common in image processing and deep learning)
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f32 = self.pts2.astype(np.float32)
+
+        # Should not raise dtype errors with float32 input
+        rel_pose = compute_relative_transform_from_points(
+            pts1_f32, pts2_f32,
+            self.left_cam, self.right_cam
+        )
+
+        self.assertIsInstance(rel_pose, Transform)
+
+        # Verify the result is still accurate
+        E = compute_essential_matrix_from_pose(rel_pose)
+        F = compute_fundamental_matrix_from_essential(self.left_cam.K, self.right_cam.K, E)
+
+        total_error = 0.
+        for i in range(self.num_pts):
+            pt1, pt2 = homo(self.pts1[:, i:i+1]), homo(self.pts2[:, i:i+1])
+            total_error += pt1.T @ F @ pt2
+        total_error /= self.num_pts
+        np.testing.assert_(abs(total_error) < 1.)
+
+    def test_compute_relative_transform_from_points_float32_ransac(self):
+        """Test relative transform with float32 input using RANSAC."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f32 = self.pts2.astype(np.float32)
+
+        # Should work with RANSAC enabled
+        rel_pose = compute_relative_transform_from_points(
+            pts1_f32, pts2_f32,
+            self.left_cam, self.right_cam,
+            use_ransac=True,
+            threshold=1e-2,
+            max_iterations=100
+        )
+
+        self.assertIsInstance(rel_pose, Transform)
+
+    def test_compute_fundamental_matrix_from_points_float32(self):
+        """Test fundamental matrix computation with float32 points."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f32 = self.pts2.astype(np.float32)
+
+        F = compute_fundamental_matrix_from_points(pts1_f32, pts2_f32)
+
+        # Verify fundamental matrix properties
+        self.assertEqual(F.shape, (3, 3))
+
+        # Test epipolar constraint
+        total_error = 0.
+        for i in range(self.num_pts):
+            pt1, pt2 = homo(self.pts1[:, i:i+1]), homo(self.pts2[:, i:i+1])
+            total_error += pt1.T @ F @ pt2
+        total_error /= self.num_pts
+        np.testing.assert_(abs(total_error) < 1.)
+
+    def test_compute_fundamental_matrix_using_ransac_float32(self):
+        """Test RANSAC fundamental matrix with float32 points."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f32 = self.pts2.astype(np.float32)
+
+        F, inliers = compute_fundamental_matrix_using_ransac(pts1_f32, pts2_f32)
+
+        self.assertEqual(F.shape, (3, 3))
+        self.assertGreater(inliers, 0)
+
+    def test_triangulate_points_float32(self):
+        """Test triangulation with float32 points."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f32 = self.pts2.astype(np.float32)
+
+        recover_pts3d = triangulate_points(
+            pts1_f32, pts2_f32,
+            self.left_cam, self.right_cam,
+            self.left_c2w.inverse(), self.rel_pose.inverse()
+        )
+
+        self.assertEqual(recover_pts3d.shape[0], 3)
+        self.assertGreater(recover_pts3d.shape[1], 0)
+
+        # Verify reconstruction accuracy
+        pts3d_c2 = self.rel_pose.inverse() * recover_pts3d
+        pts1_reproj, _ = self.left_cam.convert_to_pixels(recover_pts3d, out_subpixel=True)
+        pts2_reproj, _ = self.right_cam.convert_to_pixels(pts3d_c2, out_subpixel=True)
+
+        error1 = mean(norm(self.pts1.astype(np.float64) - pts1_reproj, dim=0))
+        error2 = mean(norm(self.pts2.astype(np.float64) - pts2_reproj, dim=0))
+        total_error = error1 + error2
+        np.testing.assert_(total_error < 1.)
+
+    def test_triangulate_points_mixed_dtype(self):
+        """Test triangulation with mixed float32/float64 (auto promotion)."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f64 = self.pts2.astype(np.float64)
+
+        # Should automatically promote to float64
+        recover_pts3d = triangulate_points(
+            pts1_f32, pts2_f64,
+            self.left_cam, self.right_cam,
+            self.left_c2w.inverse(), self.rel_pose.inverse()
+        )
+
+        self.assertEqual(recover_pts3d.shape[0], 3)
+        self.assertGreater(recover_pts3d.shape[1], 0)
+
+    def test_compute_fundamental_matrix_mixed_dtype(self):
+        """Test fundamental matrix with mixed dtypes."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f64 = self.pts2.astype(np.float64)
+
+        # Should automatically promote to float64
+        F = compute_fundamental_matrix_from_points(pts1_f32, pts2_f64)
+
+        self.assertEqual(F.shape, (3, 3))
+        # Result should be in promoted dtype (float64)
+        self.assertEqual(F.dtype, np.float64)
+
+    def test_compute_relative_transform_mixed_dtype(self):
+        """Test relative transform with mixed dtypes."""
+        pts1_f32 = self.pts1.astype(np.float32)
+        pts2_f64 = self.pts2.astype(np.float64)
+
+        # Should handle mixed dtypes automatically
+        rel_pose = compute_relative_transform_from_points(
+            pts1_f32, pts2_f64,
+            self.left_cam, self.right_cam
+        )
+
+        self.assertIsInstance(rel_pose, Transform)
+
 
 class TestGeomUtilsExceptions(unittest.TestCase):
     """Test exception handling in geom_utils functions."""

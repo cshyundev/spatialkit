@@ -112,6 +112,8 @@ class Pose:
         t = t.reshape(1, 3)
 
         self._t: ArrayLike = convert_numpy(t)
+        # Enforce float32 for consistent precision and memory efficiency
+        self._t = self._t.astype(np.float32)
         self._rot: Rotation = rot
 
     @property

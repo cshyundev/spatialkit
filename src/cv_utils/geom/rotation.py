@@ -431,6 +431,8 @@ class Rotation:
                 )
             self.data = rpy_to_SO3(data)
         self.data = convert_numpy(self.data)
+        # Enforce float32 for consistent precision and memory efficiency
+        self.data = self.data.astype(np.float32)
 
     # constructor
     @staticmethod
