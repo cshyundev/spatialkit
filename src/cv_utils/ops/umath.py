@@ -25,7 +25,9 @@ Usage:
 tensor(2.5000)
 """
 
+from typing import Optional, Union, Tuple, List
 from scipy.linalg import expm
+import numpy as np
 import torch
 
 from .uops import *
@@ -102,19 +104,30 @@ def dot(x: ArrayLike, y: ArrayLike) -> ArrayLike:
     Args:
         x (ArrayLike): First input array or tensor.
         y (ArrayLike): Second input array or tensor.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
 
     Returns:
-        ArrayLike: Dot product of x and y.
-        
+        ArrayLike: Dot product of x and y with promoted dtype.
+
     Raises:
-        IncompatibleTypeError: If input arrays have different types.
+        IncompatibleTypeError: If input arrays have different types (numpy vs tensor).
     """
     if not isinstance(x, type(y)):
         raise IncompatibleTypeError(
             f"Both arrays must be of the same type, got {type(x).__name__} and {type(y).__name__}. "
             f"Please ensure both inputs are either numpy arrays or torch tensors."
         )
-    
+
+    # Promote dtypes if different
+    if x.dtype != y.dtype:
+        target_dtype = promote_types(x, y)
+        if is_tensor(x):
+            x = x.type(target_dtype)
+            y = y.type(target_dtype)
+        else:
+            x = x.astype(target_dtype)
+            y = y.astype(target_dtype)
+
     if is_tensor(x):
         return torch.dot(x, y)
     return np.dot(x, y)
@@ -308,26 +321,44 @@ def matmul(x: ArrayLike, y: ArrayLike) -> ArrayLike:
     Args:
         x (ArrayLike): First input array or tensor.
         y (ArrayLike): Second input array or tensor.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
 
     Returns:
-        ArrayLike: Result of matrix multiplication.
-        
+        ArrayLike: Result of matrix multiplication with promoted dtype.
+
     Raises:
         InvalidDimensionError: If input arrays are not at least 1D.
         InvalidShapeError: If matrix dimensions are incompatible for multiplication.
+        IncompatibleTypeError: If mixing numpy and tensor types.
     """
     if x.ndim < 1 or y.ndim < 1:
         raise InvalidDimensionError(
             f"Matrix multiplication requires at least 1D arrays, got shapes {x.shape} and {y.shape}. "
             f"Please ensure both inputs are at least 1-dimensional."
         )
-    
+
     if x.shape[-1] != y.shape[0]:
         raise InvalidShapeError(
             f"Matrix multiplication dimension mismatch: {x.shape[-1]} != {y.shape[0]}. "
             f"Please ensure the last dimension of first array matches the first dimension of second array."
         )
-    
+
+    # Check type compatibility and promote dtypes if different
+    if not isinstance(x, type(y)):
+        raise IncompatibleTypeError(
+            f"Both arrays must be of the same type, got {type(x).__name__} and {type(y).__name__}. "
+            f"Please ensure both inputs are either numpy arrays or torch tensors."
+        )
+
+    if x.dtype != y.dtype:
+        target_dtype = promote_types(x, y)
+        if is_tensor(x):
+            x = x.type(target_dtype)
+            y = y.type(target_dtype)
+        else:
+            x = x.astype(target_dtype)
+            y = y.astype(target_dtype)
+
     if is_tensor(x):
         return torch.matmul(x, y)
     return x @ y
@@ -547,12 +578,35 @@ def arctan2(x: ArrayLike, y: ArrayLike) -> ArrayLike:
     Args:
         x (ArrayLike): First input array or tensor.
         y (ArrayLike): Second input array or tensor.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
 
     Returns:
-        ArrayLike: Element-wise arctangent of x/y.
+        ArrayLike: Element-wise arctangent of x/y with promoted dtype.
+
+    Raises:
+        IncompatibleTypeError: If mixing numpy and tensor types.
     """
+    # Ensure same type (numpy or tensor)
+    if not isinstance(x, type(y)):
+        if is_tensor(x):
+            y = convert_tensor(y, x)
+        else:
+            raise IncompatibleTypeError(
+                f"Both arrays must be of the same type, got {type(x).__name__} and {type(y).__name__}. "
+                f"Please ensure both inputs are either numpy arrays or torch tensors."
+            )
+
+    # Promote dtypes if different
+    if x.dtype != y.dtype:
+        target_dtype = promote_types(x, y)
+        if is_tensor(x):
+            x = x.type(target_dtype)
+            y = y.type(target_dtype)
+        else:
+            x = x.astype(target_dtype)
+            y = y.astype(target_dtype)
+
     if is_tensor(x):
-        y = convert_tensor(y, x)
         return torch.arctan2(x, y)
     return np.arctan2(x, y)
 
@@ -617,12 +671,13 @@ def solve(A: ArrayLike, b: ArrayLike) -> ArrayLike:
     Args:
         A (ArrayLike): Coefficient matrix.
         b (ArrayLike): Ordinate or dependent variable values.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
 
     Returns:
-        ArrayLike: Solution to the system of equations.
-        
+        ArrayLike: Solution to the system of equations with promoted dtype.
+
     Raises:
-        IncompatibleTypeError: If input arrays have different types.
+        IncompatibleTypeError: If input arrays have different types (numpy vs tensor).
         NumericalError: If the linear system cannot be solved.
     """
     if not isinstance(A, type(b)):
@@ -630,7 +685,17 @@ def solve(A: ArrayLike, b: ArrayLike) -> ArrayLike:
             f"Both arrays must be of the same type, got A:{type(A).__name__} and b:{type(b).__name__}. "
             f"Please ensure both inputs are either numpy arrays or torch tensors."
         )
-    
+
+    # Promote dtypes if different
+    if A.dtype != b.dtype:
+        target_dtype = promote_types(A, b)
+        if is_tensor(A):
+            A = A.type(target_dtype)
+            b = b.type(target_dtype)
+        else:
+            A = A.astype(target_dtype)
+            b = b.astype(target_dtype)
+
     try:
         if is_tensor(A):
             return torch.linalg.solve(A, b)
@@ -746,3 +811,48 @@ def dehomo(x: ArrayLike) -> ArrayLike:
     
     euc_coords = x[:-1, :] / x[-1, :]
     return euc_coords
+
+
+__all__ = [
+    # Basic math operations
+    "abs",
+    "sqrt",
+    "mean",
+    "dot",
+    # Linear algebra decompositions
+    "qr",
+    "svd",
+    # Matrix operations
+    "determinant",
+    "inv",
+    "norm",
+    "normalize",
+    "matmul",
+    "permute",
+    "trace",
+    "diag",
+    # Trigonometric functions
+    "sin",
+    "cos",
+    "tan",
+    "arcsin",
+    "arccos",
+    "arctan",
+    "arctan2",
+    # Unit conversion
+    "rad2deg",
+    "deg2rad",
+    # Matrix exponential
+    "exponential_map",
+    # Polynomial functions
+    "polyval",
+    "polyfit",
+    # Linear systems
+    "is_square",
+    "solve",
+    "solve_linear_system",
+    # Computer vision helpers
+    "vec3_to_skew",
+    "homo",
+    "dehomo",
+]

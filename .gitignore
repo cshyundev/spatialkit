@@ -18,6 +18,9 @@ __pycache__
 *.egg-info
 dist/
 build/
+.coverage
+htmlcov/
+.pytest_cache/
 
 ## images and files
 /replica
@@ -30,3 +33,6 @@ build/
 train_trajectory.txt
 /Replica
 !/images/*
+
+## Coding Assistant
+CLAUDE.md

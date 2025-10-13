@@ -682,3 +682,148 @@ def isclose(
     if is_tensor(x):
         return torch.isclose(x, y, rtol=rtol, atol=atol)
     return np.isclose(x, y, rtol=rtol, atol=atol)
+
+
+def get_dtype(x: ArrayLike) -> Any:
+    """
+    Get the dtype of an array.
+
+    Args:
+        x (ArrayLike): Input array or tensor.
+
+    Returns:
+        Any: The dtype of the input. Returns numpy.dtype for numpy arrays,
+             torch.dtype for torch tensors.
+
+    Raises:
+        IncompatibleTypeError: If input is not a numpy array or Torch tensor.
+
+    Example:
+        >>> import numpy as np
+        >>> arr = np.array([1.0], dtype=np.float32)
+        >>> get_dtype(arr)
+        dtype('float32')
+        >>> get_dtype(arr) == np.float32
+        True
+    """
+    if not is_array(x):
+        raise IncompatibleTypeError(
+            f"Input must be a numpy array or Torch tensor, got {type(x)}."
+        )
+    return x.dtype
+
+
+def promote_types(*arrays: ArrayLike) -> Any:
+    """
+    Find the promoted dtype among multiple arrays.
+    Returns the highest precision dtype following numpy/torch promotion rules.
+
+    Promotion examples:
+        - int32 + float32 → float32
+        - float32 + float64 → float64
+
+    Args:
+        *arrays (ArrayLike): Variable number of arrays. All must be either numpy arrays
+                            or torch tensors (no mixing allowed).
+
+    Returns:
+        Any: The promoted dtype (numpy.dtype for numpy arrays, torch.dtype for tensors).
+
+    Raises:
+        InvalidDimensionError: If no arrays are provided.
+        IncompatibleTypeError: If mixing numpy and tensor types, or if any input is not an array.
+
+    Example:
+        >>> import numpy as np
+        >>> a = np.array([1], dtype=np.float32)
+        >>> b = np.array([2], dtype=np.float64)
+        >>> promote_types(a, b)
+        dtype('float64')
+        >>> a.astype(promote_types(a, b)).dtype
+        dtype('float64')
+    """
+    if len(arrays) == 0:
+        raise InvalidDimensionError(
+            "At least one array is required for dtype promotion."
+        )
+
+    # Validate all inputs are arrays
+    for i, arr in enumerate(arrays):
+        if not is_array(arr):
+            raise IncompatibleTypeError(
+                f"All inputs must be numpy arrays or torch tensors. "
+                f"Input at index {i} has type {type(arr)}."
+            )
+
+    # Check if all numpy or all tensor (no mixing)
+    all_numpy = all(is_numpy(arr) for arr in arrays)
+    all_tensor = all(is_tensor(arr) for arr in arrays)
+
+    if not (all_numpy or all_tensor):
+        raise IncompatibleTypeError(
+            "Cannot promote dtype between numpy and tensor types. "
+            "All arrays must be of the same type (all numpy or all torch)."
+        )
+
+    if all_numpy:
+        # Use numpy's promote_types
+        result_dtype = arrays[0].dtype
+        for arr in arrays[1:]:
+            result_dtype = np.promote_types(result_dtype, arr.dtype)
+        return result_dtype
+    else:
+        # Use torch's promote_types
+        result_dtype = arrays[0].dtype
+        for arr in arrays[1:]:
+            result_dtype = torch.promote_types(result_dtype, arr.dtype)
+        return result_dtype
+
+
+__all__ = [
+    # Type alias
+    "ArrayLike",
+    # Type checking
+    "is_tensor",
+    "is_numpy",
+    "is_array",
+    # Type conversion
+    "convert_tensor",
+    "convert_numpy",
+    "convert_array",
+    "convert_dict_tensor",
+    # Array properties
+    "numel",
+    # Dimension manipulation
+    "expand_dim",
+    "reduce_dim",
+    # Array construction
+    "concat",
+    "stack",
+    "ones_like",
+    "zeros_like",
+    "empty_like",
+    "full_like",
+    "arange",
+    # Array operations
+    "deep_copy",
+    "where",
+    "clip",
+    "eye",
+    "transpose2d",
+    "swapaxes",
+    # Type casting
+    "as_bool",
+    "as_int",
+    "as_float",
+    # Dtype utilities
+    "get_dtype",
+    "promote_types",
+    # Logical operations
+    "logical_or",
+    "logical_and",
+    "logical_not",
+    "logical_xor",
+    # Comparison
+    "allclose",
+    "isclose",
+]

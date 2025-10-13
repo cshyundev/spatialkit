@@ -11,6 +11,7 @@ Version: 0.2.0-alpha
 License: MIT LICENSE
 """
 
+from typing import Optional, Tuple, Any
 import numpy as np
 from .rotation import Rotation, slerp
 from .pose import Pose
@@ -65,7 +66,9 @@ class Transform:
 
         t = t.reshape(1, 3)
 
-        self._t = t
+        # Convert to numpy and enforce float32 for consistent precision and memory efficiency
+        from ..ops.uops import convert_numpy
+        self._t = convert_numpy(t).astype(np.float32)
         self._rot = rot
 
     @property
@@ -306,9 +309,10 @@ class Transform:
         if isinstance(other, Transform):
             return self.merge(other)
         elif isinstance(other, Pose):
-            t_new = self.rot.apply_pts3d(other.t) + self.t
+            # other.t is (1, 3), need to transpose for apply_pts3d which expects (3, N)
+            t_new = self.rot.apply_pts3d(transpose2d(other.t)) + transpose2d(self.t)
             r_new = self.rot * other._rot
-            return Pose(t_new, r_new)
+            return Pose(transpose2d(t_new), r_new)
         elif is_array(other):
             return self.apply_pts3d(other)
         else:

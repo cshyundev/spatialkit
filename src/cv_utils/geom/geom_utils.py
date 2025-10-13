@@ -27,6 +27,8 @@ import cv2 as cv
 
 import numpy as np
 from ..ops.uops import *
+from ..ops.umath import inv, svd, dehomo, determinant, norm, sqrt
+from ..common.constant import EPSILON
 from .pose import Pose
 from .rotation import Rotation
 from .tf import Transform
@@ -82,18 +84,26 @@ def compute_fundamental_matrix_from_points(
 
     Args:
         pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points in each image.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
 
     Returns:
-        F (np.ndarray, [3,3]): The computed fundamental matrix.
+        F (np.ndarray, [3,3]): The computed fundamental matrix with promoted dtype.
 
     Raises:
-        ValueError: If insufficient or incorrect data is provided.
+        InvalidShapeError: If point arrays have mismatched shapes.
+        InvalidDimensionError: If insufficient points or incorrect dimensions.
     """
     # Ensure pts1 and pts2 are numpy arrays
     if isinstance(pts1, list):
         pts1 = np.array(pts1).T
     if isinstance(pts2, list):
         pts2 = np.array(pts2).T
+
+    # Promote dtypes if different (auto dtype promotion)
+    if pts1.dtype != pts2.dtype:
+        target_dtype = promote_types(pts1, pts2)
+        pts1 = pts1.astype(target_dtype)
+        pts2 = pts2.astype(target_dtype)
 
     if pts1.shape != pts2.shape:
         raise InvalidShapeError(
@@ -265,9 +275,10 @@ def solve_pnp(
 ) -> Transform:
     """
     Computes the camera pose using the Perspective-n-Point (PnP) problem solution.
+
     Args:
-        pts2d (np.ndarray, [2,N]): 2D image points.
-        pts3d (np.ndarray, [3,N]): Corresponding 3D scene points.
+        pts2d (np.ndarray, [2,N]): 2D image points. Supports both float32 and float64.
+        pts3d (np.ndarray, [3,N]): Corresponding 3D scene points. Supports both float32 and float64.
         cam (Camera): Camera instance which can be one of available models.
         cv_flags (Any, optional): Additional options for solving PnP.
 
@@ -275,7 +286,10 @@ def solve_pnp(
         Transform: A Transform Instance from object coordinates to camera coordinates.
 
     Raises:
-        AssertionError: If the camera type is not supported.
+        CalibrationError: If the camera type is not supported or PnP fails.
+
+    Note:
+        Internally converts to float64 for OpenCV compatibility.
     """
     cam_type = cam.cam_type
     unavailable_cam_types = []
@@ -294,8 +308,14 @@ def solve_pnp(
 
     pts2d = dehomo(rays)  # [xd, yd, 1]
 
+    # OpenCV solvePnP requires float64
+    pts3d_f64 = as_float(pts3d, 64)
+    pts2d_f64 = as_float(pts2d, 64)
+    K_f64 = np.eye(3, dtype=np.float64)
+    dist_f64 = np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
     ret, rvec, tvec = cv.solvePnP(
-        pts3d.T, pts2d.T, np.eye(3), np.array([0.0, 0.0, 0.0, 0.0, 0.0]), flags=cv_flags
+        pts3d_f64.T, pts2d_f64.T, K_f64, dist_f64, flags=cv_flags
     )
     if ret is True:
         return Transform.from_rot_vec_t(rvec, tvec)
@@ -439,19 +459,30 @@ def triangulate_points(
     Triangulate points from corresponding points between two cameras.
 
     Args:
-        pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points
+        pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
         cam1, cam2 (Camera): Camera Instance.
         w2c1 (Union[Pose, Transform]): World to first camera Transform or Pose.
         w2c2 (Union[Pose, Transform]): World to first camera Transform or Pose.
 
     Returns:
         (np.ndarray, [3,N]) : Array containing the 3D coordinates of the triangulated points.
+
+    Note:
+        Internally converts to float64 for OpenCV compatibility.
     """
     # Convert points to numpy array if they are given as lists
     if isinstance(pts1, list):
         pts1 = np.array(pts1).T  # [2,N]
     if isinstance(pts2, list):
         pts2 = np.array(pts2).T  # [2,N]
+
+    # Promote dtypes if different (auto dtype promotion)
+    if isinstance(pts1, np.ndarray) and isinstance(pts2, np.ndarray):
+        if pts1.dtype != pts2.dtype:
+            target_dtype = promote_types(pts1, pts2)
+            pts1 = pts1.astype(target_dtype)
+            pts2 = pts2.astype(target_dtype)
 
     rays1, _ = cam1.convert_to_rays(pts1)
     rays2, _ = cam2.convert_to_rays(pts2)
@@ -462,7 +493,13 @@ def triangulate_points(
     P1 = w2c1.mat34()
     P2 = w2c2.mat34()
 
-    points_4d_hom = cv.triangulatePoints(P1, P2, pts1_norm, pts2_norm)
+    # OpenCV triangulatePoints requires float64
+    P1_f64 = as_float(P1, 64)
+    P2_f64 = as_float(P2, 64)
+    pts1_norm_f64 = as_float(pts1_norm, 64)
+    pts2_norm_f64 = as_float(pts2_norm, 64)
+
+    points_4d_hom = cv.triangulatePoints(P1_f64, P2_f64, pts1_norm_f64, pts2_norm_f64)
 
     points_3d = dehomo(points_4d_hom)
     return points_3d
@@ -481,7 +518,8 @@ def compute_relative_transform_from_points(
     Computes the relative transform between two sets of points observed by two cameras.
 
     Args:
-        pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points
+        pts1, pts2 (Union[np.ndarray, List[Tuple[int]]], [2,N] or [N,2]): Corresponding points.
+            Supports both float32 and float64. If dtypes differ, they are promoted to higher precision.
         cam1, cam2 (Camera): Camera Instance.
         use_ransac (bool, optional): Flag to use RANSAC for fundamental matrix computation. Defaults to False.
         threshold (float, optional): RANSAC reprojection threshold. Defaults to 1e-3.
@@ -493,13 +531,22 @@ def compute_relative_transform_from_points(
     Details:
     - Converts input points to normalized image coordinates to support various camera models.
     - Uses only the points with positive z components of the rays for the computation.
-    """
 
+    Note:
+        Internally converts to float64 for OpenCV compatibility.
+    """
     # Convert points to numpy array if they are given as lists
     if isinstance(pts1, list):
         pts1 = np.array(pts1).T  # [2,N]
     if isinstance(pts2, list):
         pts2 = np.array(pts2).T  # [2,N]
+
+    # Promote dtypes if different (auto dtype promotion)
+    if isinstance(pts1, np.ndarray) and isinstance(pts2, np.ndarray):
+        if pts1.dtype != pts2.dtype:
+            target_dtype = promote_types(pts1, pts2)
+            pts1 = pts1.astype(target_dtype)
+            pts2 = pts2.astype(target_dtype)
 
     rays1, mask1 = cam1.convert_to_rays(pts1)
     rays2, mask2 = cam2.convert_to_rays(pts2)
@@ -520,10 +567,15 @@ def compute_relative_transform_from_points(
     else:
         E = compute_fundamental_matrix_from_points(pts1_norm, pts2_norm)
 
-    _, R, t, _ = cv.recoverPose(E, pts1_norm.T, pts2_norm.T, np.eye(3))
+    # OpenCV recoverPose requires float64
+    E_f64 = as_float(E, 64)
+    pts1_norm_f64 = as_float(pts1_norm.T, 64)
+    pts2_norm_f64 = as_float(pts2_norm.T, 64)
+    K_f64 = np.eye(3, dtype=np.float64)
+
+    _, R, t, _ = cv.recoverPose(E_f64, pts1_norm_f64, pts2_norm_f64, K_f64)
 
     return Transform(t, Rotation.from_mat3(R))
-
 
 def compute_relative_transform(
     image1: np.ndarray,
@@ -682,7 +734,7 @@ def convert_depth_to_point_cloud(
     elif map_type == "MSI":
         pts3d = rays * depth
     elif map_type == "MCI":
-        r = sqrt(rays[0, :] ** 2 + rays[2, :] ** 2).reshape(-1, 1)
+        r = sqrt(rays[0, :] ** 2 + rays[2, :] ** 2).reshape(1, -1)
         mask = logical_and(
             mask,
             (r != 0.0).reshape(

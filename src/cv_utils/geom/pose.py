@@ -17,7 +17,9 @@ Version: 0.2.0-alpha
 License: MIT LICENSE
 """
 
+from typing import Optional, Tuple
 import numpy as np
+
 from .rotation import Rotation, SO3_to_so3, slerp, so3_to_SO3
 from ..ops.uops import *
 from ..ops.umath import *
@@ -110,6 +112,8 @@ class Pose:
         t = t.reshape(1, 3)
 
         self._t: ArrayLike = convert_numpy(t)
+        # Enforce float32 for consistent precision and memory efficiency
+        self._t = self._t.astype(np.float32)
         self._rot: Rotation = rot
 
     @property
