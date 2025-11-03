@@ -3,8 +3,8 @@ import numpy as np
 import torch
 
 # Use new hierarchical import pattern
-from cv_utils import OpenCVFisheyeCamera, ThinPrismFisheyeCamera
-from cv_utils.exceptions import InvalidCameraParameterError, InvalidShapeError
+from spatialkit import OpenCVFisheyeCamera, ThinPrismFisheyeCamera
+from spatialkit.common.exceptions import InvalidCameraParameterError, InvalidShapeError
 
 
 class TestOpenCVFisheyeCamera(unittest.TestCase):

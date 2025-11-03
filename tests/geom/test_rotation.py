@@ -3,8 +3,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation as SciPyRotation
 
 # Use new hierarchical import pattern
-from cv_utils import Rotation, RotType
-from cv_utils.geom.rotation import is_SO3, slerp
+from spatialkit import Rotation, RotType
+from spatialkit.geom.rotation import is_SO3, slerp
 
 class TestRotation(unittest.TestCase):
 

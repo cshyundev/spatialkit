@@ -1,0 +1,13 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [0.3.0] - 2025-01-01
+
+### Initial Public Release
+
+First public release of spatialkit - a computer vision and robotics library for 3D vision tasks.
+
+Key features include unified NumPy/PyTorch operations, 3D geometry classes, multiple camera models, and ROS2 compatibility.

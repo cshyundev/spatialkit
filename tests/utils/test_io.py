@@ -1,5 +1,5 @@
 """
-Test suite for cv_utils.utils.io module.
+Test suite for spatialkit.utils.io module.
 
 This module tests file I/O operations including TIFF, image, JSON, YAML,
 PGM formats, and video writing functionality.
@@ -16,9 +16,8 @@ import yaml
 import numpy as np
 from pathlib import Path
 
-import cv_utils
-from cv_utils.utils import io
-from cv_utils.exceptions import (
+from spatialkit import io
+from spatialkit.common.exceptions import (
     FileNotFoundError as CVFileNotFoundError,
     FileFormatError,
     ReadWriteError

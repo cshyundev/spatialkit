@@ -3,12 +3,12 @@ import numpy as np
 import torch
 
 # Use new hierarchical import pattern
-from cv_utils import (
+from spatialkit import (
     OmnidirectionalCamera,
     DoubleSphereCamera,
     EquirectangularCamera
 )
-from cv_utils.exceptions import InvalidCameraParameterError, InvalidShapeError
+from spatialkit.common.exceptions import InvalidCameraParameterError, InvalidShapeError
 
 
 class TestOmnidirectionalCamera(unittest.TestCase):

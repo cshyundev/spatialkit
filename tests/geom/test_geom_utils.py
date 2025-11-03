@@ -1,14 +1,16 @@
 import unittest
 import numpy as np
-from cv_utils.geom.camera import *
-from cv_utils.geom.geom_utils import *
-from cv_utils.ops.uops import *
-from cv_utils.ops.umath import *
-from cv_utils.common.logger import LOG_INFO
-from cv_utils.exceptions import (
+from spatialkit.camera import *
+from spatialkit.geom import *
+from spatialkit.imgproc import *
+from spatialkit.ops.uops import *
+from spatialkit.ops.umath import *
+from spatialkit.common.logger import LOG_INFO
+from spatialkit.common.exceptions import (
     InvalidShapeError,
     InvalidDimensionError,
     CalibrationError,
+    ProjectionError
 )
 
 

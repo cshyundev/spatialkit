@@ -8,8 +8,8 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 # Use new hierarchical import pattern
-import cv_utils
-from cv_utils import uops
+import spatialkit
+from spatialkit import uops
 
 
 class TestHybridOperations(unittest.TestCase):
@@ -154,7 +154,7 @@ class TestHybridOperations(unittest.TestCase):
             self.assertEqual(result_torch, 3)
 
         # Test error handling
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.numel([1, 2, 3])
 
     def test_zeros_like(self):
@@ -273,7 +273,7 @@ class TestHybridOperations(unittest.TestCase):
             torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.InvalidShapeError):
+        with self.assertRaises(spatialkit.InvalidShapeError):
             uops.transpose2d(self.numpy_array)
 
     def test_swapaxes(self):
@@ -341,7 +341,7 @@ class TestHybridOperations(unittest.TestCase):
             torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.logical_not([True, False])
 
     def test_logical_xor(self):
@@ -349,7 +349,7 @@ class TestHybridOperations(unittest.TestCase):
         # For now, we'll test the error handling only
 
         # Test error handling
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.logical_xor([True, False])
 
     def test_allclose(self):
@@ -367,7 +367,7 @@ class TestHybridOperations(unittest.TestCase):
             self.assertTrue(result_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.allclose(x_np, self.torch_tensor if TORCH_AVAILABLE else x_np)
 
     def test_isclose(self):
@@ -388,17 +388,17 @@ class TestHybridOperations(unittest.TestCase):
     def test_convert_tensor_error(self):
         # Test error handling for convert_tensor
         if TORCH_AVAILABLE:
-            with self.assertRaises(cv_utils.IncompatibleTypeError):
+            with self.assertRaises(spatialkit.IncompatibleTypeError):
                 uops.convert_tensor(self.numpy_array, tensor=self.numpy_array)
 
     def test_ones_like_error(self):
         # Test error handling for ones_like
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.ones_like([1, 2, 3])
 
     def test_logical_and_error(self):
         # Test error handling for logical_and with < 2 arrays
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             uops.logical_and(self.numpy_array)
 
 
@@ -426,7 +426,7 @@ class TestDtypeUtilities(unittest.TestCase):
 
     def test_get_dtype_error(self):
         """Test get_dtype with invalid input."""
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.get_dtype([1, 2, 3])
 
     def test_promote_types_numpy(self):
@@ -468,13 +468,13 @@ class TestDtypeUtilities(unittest.TestCase):
 
     def test_promote_types_no_arrays(self):
         """Test promote_types with no arrays."""
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             uops.promote_types()
 
     def test_promote_types_invalid_input(self):
         """Test promote_types with non-array input."""
         arr = np.array([1.0])
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.promote_types(arr, [1, 2, 3])
 
     @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
@@ -483,7 +483,7 @@ class TestDtypeUtilities(unittest.TestCase):
         arr_np = np.array([1.0])
         arr_torch = torch.tensor([2.0])
 
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.promote_types(arr_np, arr_torch)
 
 

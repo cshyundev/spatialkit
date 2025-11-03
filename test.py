@@ -1,17 +1,27 @@
-import cv2
+import spatialkit as sp
 import numpy as np
-import cv_utils as cvu
+import torch
 
-# depth map 파일 읽기 (.npy 포맷)
-depth_map = np.load("depth_map.npy")  # 실제 파일 경로로 수정 필요
+# Create 3D points (3, N) - works with both NumPy and PyTorch
+pts_np = np.random.rand(3, 100)
+pts_torch = torch.rand(3, 100)
 
-# 360도 카메라 모델 생성 (equirectangular)
-height, width = depth_map.shape
-cam = cvu.camera.EquirectangularCamera.from_image_size((width, height))
+# Create rotation from RPY (Roll-Pitch-Yaw)
+rot = sp.Rotation.from_rpy(np.array([0, np.pi/4, 0]))  # 45° pitch
 
-# depth map을 point cloud로 변환 (MSI 타입 - spherical distance)
-points_3d = cvu.geom_utils.convert_depth_to_point_cloud(depth_map, cam, map_type="MSI")
+# Apply rotation using multiplication operator - type is preserved
+rotated_np = rot * pts_np        # NumPy in → NumPy out
+rotated_torch = rot * pts_torch  # Torch in → Torch out
 
-# point cloud 시각화
-pcd = cvu.vis3d.o3dutils.create_point_cloud(points_3d)
-cvu.vis3d.o3dutils.visualize_geometries([pcd], "360 Camera Point Cloud")
+print(type(rotated_np))    # <class 'numpy.ndarray'>
+print(type(rotated_torch)) # <class 'torch.Tensor'>
+
+# Create transform (rotation + translation)
+tf = sp.Transform(t=np.array([1., 0., 0.]), rot=rot)
+
+# Apply transform using multiplication operator
+pts_transformed = tf * pts_np
+
+# Chain transformations
+tf_combined = tf * tf.inverse()  # Returns identity transform
+print(tf_combined.mat44())

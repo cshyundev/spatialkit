@@ -1,125 +1,296 @@
-# 프로젝트 아키텍처 및 의존성 문서
+# Project Architecture and Dependency Documentation
 
-**최종 수정 날짜:** 2025년 2월 16일  
-**버전:** 0.2.1-alpha
+**Last Updated:** 2025-11-03
+**Version:** 0.3.0-alpha
 
-이 문서는 프로젝트의 아키텍처 구조와 각 패키지의 역할 및 의존성에 대해 설명한다. 이 정보는 프로젝트의 설계 의도를 이해하고, 각 구성요소 간의 상호작용을 파악하는 데 도움을 준다.
+This document describes the project's architectural structure, the roles of each package, and their dependencies. This information helps understand the design intent and the interaction between components.
 
-## 아키텍처 개요
+## Architecture Overview
 
-프로젝트는 다수의 주요 패키지로 구성되어 있으며, 각 패키지는 독립적인 기능을 수행하고 필요에 따라 다른 패키지와 상호작용한다. 아키텍처는 주로 `common`, `ops`, `geom`, `utils`, `externals`, 그리고 `sol`의 주요 구성 요소로 나뉜다. 
+The project consists of multiple major packages, each performing independent functions and interacting with other packages as needed. The architecture is primarily divided into key components: `common`, `ops`, `geom`, `camera`, `imgproc`, `io`, `vis2d`, `vis3d`, and `markers`.
 
+## Directory Structure
 
 ```text
-cv_utils/
+spatialkit/
 ├── src/
-|   └── cv_utils/
-|      |
-|      ├── common # Common Package for this library
+│   └── spatialkit/
+│      │
+│      ├── common/           # Common package for this library
 │      │    ├── __init__.py
-|      │    ├── logger.py               # Logger 
-|      │    └── constant.py             # Constant
-|      │
-|      ├── ops/  # Package for array operations
+│      │    ├── logger.py    # Logging utilities
+│      │    ├── constant.py  # Constants
+│      │    └── exceptions.py # Exception hierarchy
+│      │
+│      ├── ops/              # Unified array operations
 │      │    ├── __init__.py
-│      │    ├── uops.py                 # Basic operations for array types
-|      │    └── umath.py                # Mathematical operations for array types
-|      │
-|      ├── geom/ # Package for 3D Geometry
-|      │    ├── __init__.py
-|      │    ├── rotation.py             # Classes related to 3D rotations
-|      │    ├── pose.py                 # Classes related to 3D poses
-|      │    ├── tf.py                   # Classes for 3D transformations
-|      │    ├── camera.py               # Classes related to camera models
-|      │    ├── img_tf.py               # 2D image transformation functions
-|      │    └── geom_utils.py           # 3D geometric operations
-|      │   
-|      ├── utils/  # Package for General utility 
-|      │   ├── point_selector.py        # Point Selector Class
-|      │   ├── vis.py                   # image utilities for visualization
-|      │   ├── io.py                    # File Utilities
-|      │   └── metrics.py (TBD)         # Metric functions
-|      │
-|      ├── externals/ # Package for External Library
-|      │   └── o3d
-|      │
-|      └── sol/  # Package for specific task
-|           ├── __init__.py
-|           ├── marker               # Classes related to Fiducial Marker
-|           └── mvs                  # Modules to Multiview Stereo 
-|
+│      │    ├── uops.py      # Basic operations for array types
+│      │    └── umath.py     # Mathematical operations for array types
+│      │
+│      ├── geom/             # 3D geometry primitives
+│      │    ├── __init__.py
+│      │    ├── rotation.py  # 3D rotation classes
+│      │    ├── pose.py      # 6-DOF pose classes
+│      │    ├── tf.py        # 3D transformation classes
+│      │    ├── epipolar.py  # Epipolar geometry
+│      │    ├── multiview.py # Multi-view geometry algorithms
+│      │    └── pointcloud.py # Point cloud utilities
+│      │
+│      ├── camera/           # Camera models
+│      │    ├── __init__.py
+│      │    ├── base.py      # Base camera class
+│      │    ├── radial_base.py # Radial distortion base
+│      │    ├── perspective.py # Perspective camera
+│      │    ├── fisheye.py   # Fisheye camera models
+│      │    ├── omnidirectional.py # Omnidirectional camera
+│      │    ├── doublesphere.py # Double sphere camera
+│      │    └── equirectangular.py # Equirectangular camera
+│      │
+│      ├── imgproc/          # Image processing
+│      │    ├── __init__.py
+│      │    ├── transform.py # 2D image transformations
+│      │    └── synthesis.py # Image synthesis utilities
+│      │
+│      ├── io/               # File I/O operations
+│      │    ├── __init__.py
+│      │    ├── image.py     # Image I/O
+│      │    ├── video.py     # Video I/O with lazy loading
+│      │    └── config.py    # Configuration file I/O
+│      │
+│      ├── vis2d/            # 2D visualization
+│      │    ├── __init__.py
+│      │    ├── convert.py   # Image conversion utilities
+│      │    ├── draw.py      # Drawing functions
+│      │    └── display.py   # Display utilities
+│      │
+│      ├── vis3d/            # 3D visualization (Open3D)
+│      │    ├── __init__.py
+│      │    ├── common.py    # Open3D type aliases
+│      │    ├── components.py # 3D geometry creation
+│      │    └── o3dutils.py  # Open3D utility functions
+│      │
+│      └── markers/          # Fiducial marker detection
+│           ├── __init__.py
+│           ├── marker.py    # Marker data classes
+│           ├── base.py      # Base detector class
+│           ├── opencv_detector.py # OpenCV marker detector
+│           ├── apriltag_detector.py # AprilTag detector
+│           └── stag_detector.py # STag detector
+│
+├── tests/               # Test suite mirroring src structure
+├── examples/            # Example scripts
+├── docs/                # Documentation
 ├── README.md
 ├── LICENSE
-├── features/ # executable codes 
-├── scripts/  # shell scripts
-└── setup.py
+└── pyproject.toml
 ```
 
+## Package Descriptions
 
 ### Common
-`common` 패키지는 프로젝트 구성을 위한 공통적인 기능을 제공한다.
-- **logger.py**: 로깅 기능을 전체 프로젝트에 걸쳐 제공한다.
-- **constant.py**: 프로젝트 전체의 사용을 위해 정의된 상수를 제공한다.
+The `common` package provides foundational functionality for the entire project.
+- **logger.py**: Provides logging functionality across the entire project (LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_CRITICAL).
+- **constant.py**: Defines constants for project-wide use.
+- **exceptions.py**: Defines the hierarchical exception system used throughout spatialkit.
 
+### Operations (ops)
+The `ops` package provides basic and mathematical operations for array-type data with unified interfaces for both NumPy and PyTorch.
+- **uops.py**: Provides unified basic operation functions for NumPy and PyTorch arrays (type checking, conversion, array construction, shape manipulation).
+- **umath.py**: Provides unified mathematical operation functions for NumPy and PyTorch arrays (linear algebra, trigonometry, statistics).
 
-### Operations
-`ops` 패키지는 배열 타입 데이터에 대한 기본 및 수학적 연산을 제공한다.
-- **uops.py**: 넘파이와 파이토치 배열을 대응하는 기본 연산 함수를 제공한다.
-- **umath.py**: 넘파이와 파이토치 배열을 대응하는 수학적 연산 함수를 제공한다.
+**Key Features:**
+- Type-agnostic operations that work seamlessly with both NumPy and PyTorch
+- Automatic dtype handling with intelligent promotion
+- Preserves input array type (NumPy in → NumPy out, Tensor in → Tensor out)
 
+### Geometry (geom)
+The `geom` package handles various geometric operations including 3D rotations, pose estimation, transformations, and multi-view geometry.
+- **rotation.py**: Provides 3D Rotation class with support for SO3, so3, quaternions (xyzw/wxyz), and roll-pitch-yaw representations.
+- **pose.py**: Provides 6-DOF Pose class (rotation + translation).
+- **tf.py**: Provides 6-DOF Transform class.
+- **epipolar.py**: Epipolar geometry functions (fundamental matrix, essential matrix).
+- **multiview.py**: Multi-view geometry algorithms (triangulation, PnP, homography).
+- **pointcloud.py**: Point cloud processing utilities.
 
-### Geometry
-`geom` 패키지는 3D 회전, 포즈 추정, 변환, 카메라 모델링 및 이미지 변환 등 다양한 기하학적 연산을 담당한다.
-- **img_tf.py**: 2차원 이미지 변환(Transformation) 기능을 제공한다. 
-- **camera.py**: 다양한 카메라 모델링을 제공한다.
-- **rotation.py**: 3D Rotation 클래스를 제공한다.
-- **pose.py**: 6-DOF Pose 클래스를 제공한다.
-- **tf.py**:  6-DOF Transform 클래스를 제공한다.
-- **geom_utils.py**: 기하학적 알고리즘을 구현한 함수들을 제공한다.
+**dtype Policy:**
+- All geometry classes internally store data as **float32** for memory efficiency and performance
+- Input accepts any dtype (float16/32/64), automatically converted to float32
+- When applying transformations to external arrays (e.g., `apply_pts3d`), result dtype matches input array dtype
 
+### Camera
+The `camera` package provides various camera models and projection operations.
+- **base.py**: Abstract base Camera class defining the camera interface.
+- **radial_base.py**: Base class for radial distortion models.
+- **perspective.py**: Perspective (pinhole) camera model.
+- **fisheye.py**: Fisheye camera models (OpenCV, ThinPrism).
+- **omnidirectional.py**: Omnidirectional camera model.
+- **doublesphere.py**: Double sphere camera model for wide FOV.
+- **equirectangular.py**: Equirectangular projection camera.
 
-### Utils
-`utils` 패키지는 전체 프로젝트에서 공통적으로 사용되는 유틸리티 기능을 제공한다.
-- **io.py**: 파일 입출력과 관련된 기능을 제공한다.
-- **vis.py**: 다양한 형태의 이미지 편집 및 표시 기능을 제공한다.
-- **point_selector.py**: 사용자에게 이미지에서 포인트를 선택하는 GUI를 제공한다.
-- **metrics.py**: 다양한 메트릭을 계산하여 성능 평가에 사용한다.
+**Supported Models:**
+- Perspective (standard pinhole)
+- OpenCV Fisheye
+- Thin Prism Fisheye
+- Omnidirectional (Scaramuzza model)
+- Double Sphere
+- Equirectangular
 
+### Image Processing (imgproc)
+The `imgproc` package provides image processing and transformation utilities.
+- **transform.py**: 2D image transformation functions (homography-based warping, etc.).
+- **synthesis.py**: Image synthesis utilities.
 
-### Externals
-`externals` 패키지는 외부 라이브러리와의 통합을 관리한다.
-- **o3d**: Open3D 라이브러리를 이용한 메시 연산을 제공한다.
+### I/O Operations (io)
+The `io` package provides file input/output operations.
+- **image.py**: Image I/O supporting PNG, JPG, TIFF, PGM formats.
+- **video.py**: Video I/O with lazy loading support for large files (VideoReader class).
+- **config.py**: Configuration file I/O for JSON and YAML formats.
 
+### 2D Visualization (vis2d)
+The `vis2d` package provides 2D image visualization utilities.
+- **convert.py**: Image conversion utilities (float_to_image, normal_to_image, concat_images, rainbow color generation).
+- **draw.py**: Drawing functions (circles, lines, polygons, correspondences).
+- **display.py**: Display utilities (show_image, show_two_images, show_correspondences).
 
-### Solutions
-`sol` 패키지는 특정 애플리케이션 또는 작업을 위해 다른 패키지들의 기능을 활용하여 구현된 기능을 포함한다.
-- **marker**: Fiducial Marker와 관련된 기능을 제공한다.
-- **mvs**: Multi View Stereo 및 3D 복원과 관련된 기능을 제공한다.
+### 3D Visualization (vis3d)
+The `vis3d` package provides 3D visualization using Open3D.
+- **common.py**: Open3D type aliases for better type hints.
+- **components.py**: 3D geometry creation (coordinate frames, camera frustums, indicators).
+- **o3dutils.py**: Open3D utility functions for visualization and mesh operations.
 
+**Note:** This package bridges spatialkit geometry classes with Open3D visualization.
 
+### Markers
+The `markers` package provides fiducial marker detection capabilities.
+- **marker.py**: Marker data classes and enumerations (Marker, FiducialMarkerType).
+- **base.py**: Abstract base MarkerDetector class.
+- **opencv_detector.py**: OpenCV-based marker detector (ArUco).
+- **apriltag_detector.py**: AprilTag marker detector.
+- **stag_detector.py**: STag marker detector.
 
-## 의존성 관리
-의존성이 명확하고 관리 가능하게 유지되도록 각 패키지의 기능을 세분화하고, 공통 기능은 재사용 가능하도록 설계한다.
+**Supported Marker Types:**
+- ArUco (via OpenCV)
+- AprilTag (multiple tag families)
+- STag
 
-### 패키지간 의존성 그래프
+## Dependency Management
+
+Dependencies are kept clear and manageable by subdividing each package's functionality and designing common features to be reusable.
+
+### Inter-Package Dependency Graph
 
 ```mermaid
 graph TD
-    common --> ops("ops")
-    common --> geom("geom")
-    common --> utils("utils")
-    externals("externals") --> sol
-    ops --> sol
-    geom --> sol
-    utils --> sol
+    common["common<br/>(logger, constants, exceptions)"]
+    ops["ops<br/>(uops, umath)"]
+    geom["geom<br/>(rotation, pose, tf, multiview)"]
+    camera["camera<br/>(base, perspective, fisheye, etc.)"]
+    imgproc["imgproc<br/>(transform, synthesis)"]
+    io["io<br/>(image, video, config)"]
+    vis2d["vis2d<br/>(convert, draw, display)"]
+    vis3d["vis3d<br/>(Open3D bridge)"]
+    markers["markers<br/>(detection)"]
 
-    classDef independent fill:#a93,stroke:#f66,stroke-width:2px
-    classDef dependent fill:#ccs,stroke:#c33,stroke-width:2px
+    common --> ops
+    common --> geom
+    common --> camera
+    common --> imgproc
+    common --> io
+    common --> vis2d
+    common --> markers
 
-    class common independent;
-    class utils dependent;
-    class ops dependent;
-    class geom dependent;
-    class externals independent;
-    class sol dependent;
+    ops --> geom
+    ops --> camera
+    ops --> imgproc
+    ops --> vis2d
+
+    geom --> camera
+    geom --> imgproc
+    geom --> markers
+    geom --> vis3d
+
+    camera --> markers
+    camera --> vis3d
+
+    io --> vis2d
+    io --> markers
+
+    vis2d --> markers
+
+    classDef foundation fill:#a8d5ba,stroke:#2d6a4f,stroke-width:2px
+    classDef core fill:#c7ceea,stroke:#4361ee,stroke-width:2px
+    classDef application fill:#ffd6a5,stroke:#e07a5f,stroke-width:2px
+    classDef visualization fill:#f4a6d7,stroke:#d946c6,stroke-width:2px
+
+    class common foundation
+    class ops,geom,camera core
+    class imgproc,io,markers application
+    class vis2d,vis3d visualization
 ```
+
+### Dependency Layers
+
+**Layer 1: Foundation**
+- `common` - No internal dependencies, provides logging, constants, and exceptions
+
+**Layer 2: Core Operations**
+- `ops` - Depends on `common`
+- Provides unified NumPy/PyTorch operations
+
+**Layer 3: Geometry & Camera**
+- `geom` - Depends on `common`, `ops`
+- `camera` - Depends on `common`, `ops`, `geom`
+- Core 3D geometry and camera modeling
+
+**Layer 4: Processing & I/O**
+- `imgproc` - Depends on `common`, `ops`, `geom`
+- `io` - Depends on `common`
+- Image/video processing and file I/O
+
+**Layer 5: Visualization & Applications**
+- `vis2d` - Depends on `common`, `ops`, `io`
+- `vis3d` - Depends on `geom`, `camera` (independent bridge to Open3D)
+- `markers` - Depends on `common`, `geom`, `camera`, `io`, `vis2d`
+
+### Design Principles
+
+1. **Layered Architecture**: Lower layers have no knowledge of higher layers
+2. **Minimal Dependencies**: Each package minimizes its dependencies
+3. **Clear Interfaces**: Well-defined public APIs with `__all__` declarations
+4. **Type Consistency**: Unified operations maintain input/output type consistency
+5. **Exception Hierarchy**: Comprehensive, domain-specific exception system
+6. **Float32 Policy**: Geometry classes use float32 internally for efficiency
+
+## Key Architectural Decisions
+
+### Unified Operations Pattern
+The `ops` package provides a single interface for both NumPy and PyTorch, enabling:
+- Writing algorithm code once that works with both array types
+- Seamless integration with deep learning pipelines
+- Consistent behavior across different array backends
+
+### Geometry Class Design
+Geometry classes (`Rotation`, `Pose`, `Transform`) follow a consistent pattern:
+- Multiple constructors for different representations (e.g., `from_mat3`, `from_quat`)
+- Immutable internal state (float32 NumPy arrays)
+- Type-preserving transformations (when applied to external data)
+- Rich API for conversions between representations
+
+### Camera Model Abstraction
+The camera hierarchy provides:
+- Abstract base class defining the projection/unprojection interface
+- Specialized implementations for different distortion models
+- Factory methods for common construction patterns
+- Support for both forward and inverse projections
+
+### Exception-Driven Error Handling
+All validation uses exceptions (never `assert` for user input):
+- Hierarchical exception types for selective catching
+- Clear, actionable error messages
+- Consistent validation patterns across the codebase
+
+## Version History
+
+- **v0.3.0-alpha** (2025-11-03): Restructured packages, added camera models, improved exception handling
+- **v0.2.1-alpha** (2025-01-30): Added exception hierarchy, migrated to uv
+- **v0.2.0-alpha** (2024-12): Initial unified operations, geometry classes

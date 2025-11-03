@@ -9,8 +9,8 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 # Use new hierarchical import pattern
-import cv_utils
-from cv_utils import umath
+import spatialkit
+from spatialkit import umath
 
 class TestHybridMath(unittest.TestCase):
     
@@ -238,7 +238,7 @@ class TestHybridMath(unittest.TestCase):
         torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             umath.mean(x_np, dim=5)
 
     def test_dot(self):
@@ -257,13 +257,13 @@ class TestHybridMath(unittest.TestCase):
         torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling for incompatible types
-        with self.assertRaises(cv_utils.IncompatibleTypeError):
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
             umath.dot(x_np, y_torch)
 
     def test_qr_error_handling(self):
         # Test error handling for non-2D input
         x_1d = np.array([1, 2, 3])
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             umath.qr(x_1d)
 
     def test_trace(self):
@@ -280,7 +280,7 @@ class TestHybridMath(unittest.TestCase):
         torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             umath.trace(np.array([1, 2, 3]))
 
     def test_diag(self):
@@ -297,7 +297,7 @@ class TestHybridMath(unittest.TestCase):
         torch.testing.assert_close(result_torch, expected_torch)
 
         # Test error handling
-        with self.assertRaises(cv_utils.InvalidDimensionError):
+        with self.assertRaises(spatialkit.InvalidDimensionError):
             umath.diag(np.array([1, 2, 3]))
 
     def test_rad2deg_deg2rad(self):
@@ -392,7 +392,7 @@ class TestHybridMath(unittest.TestCase):
         self.assertTrue(torch.is_tensor(result_torch))
 
         # Test error handling
-        with self.assertRaises(cv_utils.InvalidShapeError):
+        with self.assertRaises(spatialkit.InvalidShapeError):
             umath.vec3_to_skew(np.array([1, 2]))
 
     def test_homo_dehomo(self):
@@ -403,7 +403,7 @@ class TestHybridMath(unittest.TestCase):
         np.testing.assert_array_equal(homo_pts, expected_homo)
 
         # Test homo error handling
-        with self.assertRaises(cv_utils.InvalidCoordinateError):
+        with self.assertRaises(spatialkit.InvalidCoordinateError):
             umath.homo(np.array([1, 2, 3]))
 
         # Test dehomo with 3D homogeneous points
@@ -413,7 +413,7 @@ class TestHybridMath(unittest.TestCase):
         np.testing.assert_allclose(euc_pts, expected_euc)
 
         # Test dehomo error handling
-        with self.assertRaises(cv_utils.InvalidCoordinateError):
+        with self.assertRaises(spatialkit.InvalidCoordinateError):
             umath.dehomo(np.array([[1, 2], [3, 4]]))
 
     def test_polyfit_tensor(self):

@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import pytest
 
-from cv_utils.geom.img_tf import (
+from spatialkit.imgproc import (
     translation,
     rotation,
     shear,
@@ -12,7 +12,7 @@ from cv_utils.geom.img_tf import (
     compute_homography,
     apply_transform,
 )
-from cv_utils.exceptions import (
+from spatialkit.common.exceptions import (
     InvalidShapeError,
     IncompatibleTypeError,
     InvalidDimensionError,

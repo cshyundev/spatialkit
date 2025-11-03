@@ -7,12 +7,12 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-from cv_utils.geom.pose import Pose
-from cv_utils.geom.tf import Transform, interpolate_transform
-from cv_utils.geom.rotation import Rotation
-from cv_utils.ops.uops import *
-from cv_utils.ops.umath import *
-from cv_utils.exceptions import (
+from spatialkit.geom.pose import Pose
+from spatialkit.geom.tf import Transform, interpolate_transform
+from spatialkit.geom.rotation import Rotation
+from spatialkit.ops.uops import *
+from spatialkit.ops.umath import *
+from spatialkit.common.exceptions import (
     InvalidShapeError,
     InvalidDimensionError,
     IncompatibleTypeError

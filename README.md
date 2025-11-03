@@ -1,54 +1,53 @@
-# cv_utils
+# spatialkit
 
-**현재 버전:** 0.2.1-alpha  
-**최근 업데이트:** 2025년  2월 16일  
-**상태:** 개발 중 - 이 버전은 아직 개발 중이며 버그가 포함되어 있을 수 있다.
+**Current Version:** 0.3.0-alpha
+**Last Updated:** November 1, 2025
 
-## 라이선스
+## License
 
-`cv_utils`는 MIT 라이선스에 따라 자유롭게 이용 가능하다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조한다.
+`spatialkit` is freely available under the MIT License. For details, please refer to the [LICENSE](LICENSE) file.
 
-## 소개
+## Introduction
 
-`cv_utils`는 컴퓨터 비전 및 로보틱스 분야의 연구 및 개발을 지원하기 위해 설계된 개인 라이브러리다. 이 라이브러리는 3D 비전을 포함한 컴퓨터 비전 알고리즘의 개발 및 테스트에 필요한 다양한 기능과 함수를 제공한다. `cv_utils`는 사용자가 복잡한 데이터를 효과적으로 처리하고 분석할 수 있도록 돕는 도구와 기능을 포함하고 있다.
+`spatialkit` is a personal library designed to support research and development in computer vision and robotics. This library provides various features and functions necessary for developing and testing computer vision algorithms, including 3D vision. `spatialkit` includes tools and features that help users effectively process and analyze complex data.
 
-### 주요 기능 및 특징
+### Key Features
 
-- **프로토타이핑 및 연구를 위한 테스트 코드**: 컴퓨터 비전 알고리즘 개발 및 테스트 단계에서 자주 필요한 테스트 코드를 제공한다.
-- **파이토치 지원**: 3D 데이터를 처리하고 분석하기 위한 PyTorch의 텐서를 다루는 함수와 클래스를 제공한다.
-- **주요 라이브러리 통합**: Numpy, OpenCV, Scipy, PyTorch 같은 유명 라이브러리의 핵심 기능들을 통합하여 간소화된 사용법을 제공한다.
+- **Prototyping and Research Test Code**: Provides frequently needed test code during the development and testing stages of computer vision algorithms.
+- **PyTorch Support**: Offers functions and classes for handling PyTorch tensors to process and analyze 3D data.
+- **Integration of Major Libraries**: Provides simplified usage by integrating core features of popular libraries such as NumPy, OpenCV, SciPy, and PyTorch.
 
-### 추천 대상
+### Recommended For
 
-- **컴퓨터 비전 및 로보틱스 초심자**: 다른 라이브러리에 비해 코드가 간단하고 이해하기 쉬우며, 특히 3차원 태스크에서의 코드 레벨의 이해가 용이하다.
-- **3D 비전 연구자**: 파이토치를 기반으로 한 코드와 테스트 코드를 제공하여, 딥러닝을 포함한 다양한 3D 비전 연구에서 프로그래밍 과정을 단축할 수 있다.
+- **Computer Vision and Robotics Beginners**: The code is simpler and easier to understand compared to other libraries, especially facilitating code-level understanding in 3D tasks.
+- **3D Vision Researchers**: Provides PyTorch-based code and test code, which can shorten the programming process in various 3D vision research, including deep learning.
 
-## 주의사항
+## Caution
 
-- **실행 속도 및 효율 문제**: 몇 가지 기능은 기존 OpenCV나 다른 라이브러리보다 느릴 수 있으므로, 최적화 및 속도가 중요한 연구 및 개발 시 사용에 주의해야 한다.
+- **Performance and Efficiency Issues**: Some features may be slower than existing OpenCV or other libraries, so caution should be exercised when used in research and development where optimization and speed are important.
 
-## Getting Started (개발 모드)
+## Getting Started (Development Mode)
 
-### 필요 조건
+### Requirements
 
-- **파이썬 버전**: Python >= 3.12
-- **패키지 관리자**: uv (권장) 또는 pip
-- **의존성**: 설치 과정에서 필요한 모든 의존성은 자동으로 설치됩니다
+- **Python Version**: Python >= 3.12
+- **Package Manager**: uv (recommended) or pip
+- **Dependencies**: All required dependencies will be automatically installed during installation
 
-### uv를 이용한 설치 (권장)
+### Installation Using uv (Recommended)
 
-1. uv 설치 (필요시)
+1. Install uv (if needed)
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. 리포지토리 복제
+2. Clone the repository
    ```bash
-   git clone https://github.com/cshyundev/cv_utils.git
-   cd cv_utils
+   git clone https://github.com/cshyundev/spatialkit.git
+   cd spatialkit
    ```
 
-3. 가상환경 생성 및 의존성 설치
+3. Create virtual environment and install dependencies
    ```bash
    uv venv --python 3.12
    source .venv/bin/activate  # Linux/Mac
@@ -56,15 +55,105 @@
    uv pip install -e .
    ```
 
-### pip를 이용한 설치
+### Installation Using pip
 
-1. 리포지토리 복제
+1. Clone the repository
    ```bash
-   git clone https://github.com/cshyundev/cv_utils.git
+   git clone https://github.com/cshyundev/spatialkit.git
    ```
-2. 개발 모드로 설치
-    ```bash
-    cd cv_utils
+2. Install in development mode
+     ```bash
+    cd spatialkit
     pip install -e .
     ```
+
+## Simple Examples
+
+### Unified NumPy/PyTorch Interface
+
+`spatialkit` provides a unified interface for both NumPy and PyTorch, with geometry classes that preserve input types:
+
+```python
+import spatialkit as sp
+import numpy as np
+import torch
+
+# Create 3D points (3, N) - works with both NumPy and PyTorch
+pts_np = np.random.rand(3, 100)
+pts_torch = torch.rand(3, 100)
+
+# Create rotation from RPY (Roll-Pitch-Yaw)
+rot = sp.Rotation.from_rpy(np.array([0, np.pi/4, 0]))  # 45° pitch
+
+# Apply rotation using multiplication operator - type is preserved
+rotated_np = rot * pts_np        # NumPy in → NumPy out
+rotated_torch = rot * pts_torch  # Torch in → Torch out
+
+print(type(rotated_np))    # <class 'numpy.ndarray'>
+print(type(rotated_torch)) # <class 'torch.Tensor'>
+
+# Create transform (rotation + translation)
+tf = sp.Transform(t=np.array([1., 0., 0.]), rot=rot)
+
+# Apply transform using multiplication operator
+pts_transformed = tf * pts_np
+
+# Chain transformations
+tf_combined = tf * tf.inverse()  # Returns identity transform
+
+print(tf_combined.mat44())
+```
+
+### Multiple Camera Models with Image Warping
+
+`spatialkit` supports various camera models and enables image warping between different camera models:
+
+| 360° Cubemap | Perspective | Fisheye | Double Sphere (180° FOV) |
+|:------------:|:-----------:|:-------:|:------------------------:|
+| ![360](assets/cubemap_360.png) | ![Perspective](assets/camera_perspective.png) | ![Fisheye](assets/camera_fisheye.png) | ![DoubleSphere](assets/camera_doublesphere.png) |
+
+```python
+import spatialkit as sp
+from spatialkit.imgproc.synthesis import transition_camera_view
+from spatialkit.vis2d import show_image
+
+equirect_360 = sp.io.read_image("assets/cubemap_360.png")
+img_size = [640, 480]
+
+# 1. Equirectangular camera (source 360 image)
+equirect_cam = sp.EquirectangularCamera.from_image_size([1024, 512])
+
+# 2. Perspective (Pinhole) camera
+K_perspective = [[500, 0, 320], [0, 500, 240], [0, 0, 1]]
+perspective_cam = sp.PerspectiveCamera.from_K(K_perspective, img_size)
+
+# 3. Fisheye camera (OpenCV model)
+K_fisheye = [[300, 0, 320], [0, 300, 240], [0, 0, 1]]
+D_fisheye = [-0.042595202508066574, 0.031307765215775184, -0.04104704724832258, 0.015343014605793324]
+fisheye_cam = sp.OpenCVFisheyeCamera.from_K_D(K_fisheye, img_size, D_fisheye)
+
+# 4. Double Sphere camera (180° FOV)
+double_sphere_cam = sp.DoubleSphereCamera(
+    {
+        'image_size': [640, 480],
+        'cam_type': 'DOUBLESPHERE',
+        'principal_point': [318.86121757059797, 235.7432966284313],
+        'focal_length': [122.5533262583915, 121.79271712838818],
+        'xi': -0.02235598738719681,
+        'alpha': 0.562863934931952,
+        'fov_deg': 180.0
+    }
+)
+
+# Warp image between camera models
+perspective_warped = transition_camera_view(equirect_360, equirect_cam, perspective_cam)
+fisheye_warped = transition_camera_view(equirect_360, equirect_cam, fisheye_cam)
+double_sphere_warped = transition_camera_view(equirect_360, equirect_cam, double_sphere_cam)
+
+# Display results
+show_image(equirect_360, title="Equirectangular 360 Image")
+show_image(perspective_warped, title="Perspective Camera View")
+show_image(fisheye_warped, title="Fisheye Camera View")
+show_image(double_sphere_warped, title="Double Sphere Camera View")
+```
 

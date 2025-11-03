@@ -1,6 +1,6 @@
-# Testing Guide for cv_utils
+# Testing Guide for spatialkit
 
-This guide explains how to write and run tests for the cv_utils library.
+This guide explains how to write and run tests for the spatialkit library.
 
 ## Quick Start
 
@@ -51,8 +51,8 @@ uv run pytest tests/ -v
 uv run pytest tests/ -x
 
 # Run with coverage report
-uv run pytest tests/ --cov=cv_utils --cov-report=term
-uv run pytest tests/ --cov=cv_utils --cov-report=html  # HTML report in htmlcov/
+uv run pytest tests/ --cov=spatialkit --cov-report=term
+uv run pytest tests/ --cov=spatialkit --cov-report=html  # HTML report in htmlcov/
 ```
 
 ## Test Organization
@@ -79,16 +79,16 @@ tests/
 
 ## Import Patterns
 
-The cv_utils library uses a hierarchical import pattern. Follow these guidelines:
+The spatialkit library uses a hierarchical import pattern. Follow these guidelines:
 
 ### High-Level Classes (Recommended)
 
-Import commonly used classes directly from `cv_utils`:
+Import commonly used classes directly from `spatialkit`:
 
 ```python
-from cv_utils import Rotation, Pose, Transform, Camera
-from cv_utils import PerspectiveCamera, OpenCVFisheyeCamera
-from cv_utils import uops, umath
+from spatialkit import Rotation, Pose, Transform, Camera
+from spatialkit import PerspectiveCamera, OpenCVFisheyeCamera
+from spatialkit import uops, umath
 ```
 
 ### Module-Level Imports
@@ -96,8 +96,8 @@ from cv_utils import uops, umath
 For accessing module contents:
 
 ```python
-from cv_utils import geom
-from cv_utils.geom import rotation, camera, pose
+from spatialkit import geom
+from spatialkit.geom import rotation, camera, pose
 
 # Then use:
 rotation.slerp(r1, r2, t)
@@ -109,9 +109,9 @@ camera.PerspectiveCamera(...)
 For importing specific functions:
 
 ```python
-from cv_utils.geom.rotation import slerp, is_SO3
-from cv_utils.geom.geom_utils import solve_pnp, triangulate_points
-from cv_utils.ops import uops
+from spatialkit.geom.rotation import slerp, is_SO3
+from spatialkit.geom.geom_utils import solve_pnp, triangulate_points
+from spatialkit.ops import uops
 ```
 
 ### What to Import
@@ -259,10 +259,10 @@ Check which parts of the code are covered by tests:
 
 ```bash
 # Generate coverage report
-uv run pytest tests/ --cov=cv_utils --cov-report=term
+uv run pytest tests/ --cov=spatialkit --cov-report=term
 
 # Generate HTML coverage report
-uv run pytest tests/ --cov=cv_utils --cov-report=html
+uv run pytest tests/ --cov=spatialkit --cov-report=html
 
 # Open HTML report
 open htmlcov/index.html  # macOS
@@ -301,7 +301,7 @@ Tests are automatically run on every commit. Make sure your tests pass before pu
 uv run pytest tests/
 
 # Check coverage
-uv run pytest tests/ --cov=cv_utils --cov-report=term
+uv run pytest tests/ --cov=spatialkit --cov-report=term
 
 # Run with multiple Python versions (if configured)
 tox
@@ -314,7 +314,7 @@ tox
 ```python
 import unittest
 import numpy as np
-from cv_utils import uops
+from spatialkit import uops
 
 class TestConvertNumpy(unittest.TestCase):
     def test_convert_tensor_to_numpy(self):
@@ -332,7 +332,7 @@ class TestConvertNumpy(unittest.TestCase):
 ```python
 import unittest
 import numpy as np
-from cv_utils import Rotation
+from spatialkit import Rotation
 
 class TestRotation(unittest.TestCase):
     def setUp(self):
@@ -349,8 +349,8 @@ class TestRotation(unittest.TestCase):
 
 ```python
 import unittest
-from cv_utils import Rotation
-from cv_utils.exceptions import InvalidShapeError
+from spatialkit import Rotation
+from spatialkit.exceptions import InvalidShapeError
 
 class TestRotationExceptions(unittest.TestCase):
     def test_invalid_quaternion_shape(self):

@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 # Use new hierarchical import pattern
-from cv_utils import (
+from spatialkit import (
     Camera,
     PerspectiveCamera,
     OpenCVFisheyeCamera,

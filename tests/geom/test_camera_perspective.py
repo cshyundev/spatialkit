@@ -3,8 +3,8 @@ import numpy as np
 import torch
 
 # Use new hierarchical import pattern
-from cv_utils import PerspectiveCamera
-from cv_utils.exceptions import InvalidShapeError
+from spatialkit import PerspectiveCamera
+from spatialkit.common.exceptions import InvalidShapeError
 
 
 class TestPerspectiveCamera(unittest.TestCase):

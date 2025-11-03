@@ -3,16 +3,16 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cv_utils"
-version = "0.2.1-alpha"
-description = "Computer Vision utilities for research and development"
+name = "spatialkit"
+version = "0.3.0"
+description = "A spatial computing toolkit for 3D vision and robotics"
 authors = [
     {name = "Sehyun Cha", email = "cshyundev@gmail.com"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
-keywords = ["computer-vision", "robotics", "3d-vision", "pytorch"]
+keywords = ["spatial-computing", "3d-vision", "geometry", "robotics", "pytorch", "computer-vision"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -25,26 +25,27 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy",
-    "opencv-python",
-    "torch>=2.1.0",
-    "scipy",
-    "matplotlib",
-    "scikit-image",
-    "open3d",
-    "tifffile",
-    "absl-py",
-    "rich",
-    "dt-apriltags",
-    "stag-python",
-    "Pillow",
-    "PyYAML",
+    "numpy>=1.24.0,<2.0.0",
+    "opencv-python>=4.5.0",
+    "torch>=2.0.0",
+    "scipy>=1.11.0",
+    "matplotlib>=3.7.0",
+    "scikit-image>=0.21.0",
+    "tifffile>=2023.7.0",
+    "Pillow>=10.0.0",
+    "PyYAML>=6.0",
 ]
 
+[project.optional-dependencies]
+markers = ["dt-apriltags>=3.1.7", "stag-python>=1.1.1"]
+vis3d = ["open3d>=0.19.0"]
+dev = ["pytest>=8.4.1", "pytest-cov", "absl-py>=2.3.1", "rich"]
+all = ["spatialkit[markers,vis3d]"]
+
 [project.urls]
-Homepage = "https://github.com/cshyundev/cv_utils"
-Repository = "https://github.com/cshyundev/cv_utils"
-Issues = "https://github.com/cshyundev/cv_utils/issues"
+Homepage = "https://github.com/cshyundev/spatialkit"
+Repository = "https://github.com/cshyundev/spatialkit"
+Issues = "https://github.com/cshyundev/spatialkit/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
