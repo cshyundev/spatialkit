@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spatialkit"
-version = "0.3.0"
+version = "0.3.1"
 description = "A spatial computing toolkit for 3D vision and robotics"
 authors = [
     {name = "Sehyun Cha", email = "cshyundev@gmail.com"}
@@ -34,13 +34,15 @@ dependencies = [
     "tifffile>=2023.7.0",
     "Pillow>=10.0.0",
     "PyYAML>=6.0",
+    "absl-py>=2.0.0",
+    "rich>=13.0.0",
+    "dt-apriltags>=3.1.7",
+    "stag-python>=1.1.1",
+    "open3d>=0.19.0",
 ]
 
 [project.optional-dependencies]
-markers = ["dt-apriltags>=3.1.7", "stag-python>=1.1.1"]
-vis3d = ["open3d>=0.19.0"]
-dev = ["pytest>=8.4.1", "pytest-cov", "absl-py>=2.3.1", "rich"]
-all = ["spatialkit[markers,vis3d]"]
+dev = ["pytest>=8.4.1", "pytest-cov"]
 
 [project.urls]
 Homepage = "https://github.com/cshyundev/spatialkit"
