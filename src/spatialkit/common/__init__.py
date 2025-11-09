@@ -11,7 +11,7 @@ __all__ = [
     "LOG_INFO",
     "LOG_WARN",
     # Exceptions (re-exported from exceptions module)
-    "CVUtilsError",
+    "SpatialKitError",
     "MathError", "InvalidDimensionError", "InvalidShapeError",
     "IncompatibleTypeError", "NumericalError", "SingularMatrixError",
     "GeometryError", "ConversionError", "InvalidCoordinateError",

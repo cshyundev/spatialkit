@@ -22,6 +22,11 @@ build/
 htmlcov/
 .pytest_cache/
 
+## Secrets
+.env
+.env.*
+!.env.example
+
 ## images and files
 /replica
 *.json

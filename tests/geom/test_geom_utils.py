@@ -7,6 +7,7 @@ from spatialkit.ops.uops import *
 from spatialkit.ops.umath import *
 from spatialkit.common.logger import LOG_INFO
 from spatialkit.common.exceptions import (
+    InvalidArgumentError,
     InvalidShapeError,
     InvalidDimensionError,
     CalibrationError,
@@ -258,7 +259,7 @@ class TestGeomUtils(unittest.TestCase):
         """Test depth to point cloud with invalid depth map size."""
         depth_map = np.random.rand(100, 100).astype(np.float32)  # Wrong size
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InvalidDimensionError):
             convert_depth_to_point_cloud(
                 depth_map,
                 self.left_cam,
@@ -270,7 +271,7 @@ class TestGeomUtils(unittest.TestCase):
         depth_map = np.random.rand(*self.left_cam.hw).astype(np.float32)
         color_image = np.random.rand(100, 100, 3).astype(np.uint8)  # Wrong size
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InvalidDimensionError):
             convert_depth_to_point_cloud(
                 depth_map,
                 self.left_cam,
@@ -396,7 +397,7 @@ class TestGeomUtils(unittest.TestCase):
 
     def test_convert_point_cloud_to_depth_invalid_map_type(self):
         """Test point cloud to depth with invalid map type."""
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InvalidArgumentError):
             convert_point_cloud_to_depth(
                 self.pts3d.T,
                 self.left_cam,

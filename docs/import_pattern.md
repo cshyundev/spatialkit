@@ -90,7 +90,7 @@ from .common.logger import LOG_CRITICAL, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WAR
 
 # Exception hierarchy
 from .common.exceptions import (
-    CVUtilsError,
+    SpatialKitError,
     MathError, InvalidDimensionError, InvalidShapeError,
     IncompatibleTypeError, NumericalError, SingularMatrixError,
     GeometryError, ConversionError, InvalidCoordinateError,

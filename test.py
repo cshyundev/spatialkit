@@ -1,27 +1,20 @@
-import spatialkit as sp
 import numpy as np
-import torch
 
-# Create 3D points (3, N) - works with both NumPy and PyTorch
-pts_np = np.random.rand(3, 100)
-pts_torch = torch.rand(3, 100)
+a = np.ones((2,2,3))
 
-# Create rotation from RPY (Roll-Pitch-Yaw)
-rot = sp.Rotation.from_rpy(np.array([0, np.pi/4, 0]))  # 45° pitch
+print(a[:, :, 0])
+print(a[:, :, 1])
+print(a[:, :, 2])
 
-# Apply rotation using multiplication operator - type is preserved
-rotated_np = rot * pts_np        # NumPy in → NumPy out
-rotated_torch = rot * pts_torch  # Torch in → Torch out
 
-print(type(rotated_np))    # <class 'numpy.ndarray'>
-print(type(rotated_torch)) # <class 'torch.Tensor'>
+print('--------------')
 
-# Create transform (rotation + translation)
-tf = sp.Transform(t=np.array([1., 0., 0.]), rot=rot)
+padded = np.pad(a, ((1,1),(1,1),(0,0)), mode='constant')
+print(padded.shape)
 
-# Apply transform using multiplication operator
-pts_transformed = tf * pts_np
+print(padded[:, :, 0])
+print(padded[:, :, 1])
+print(padded[:, :, 2])
 
-# Chain transformations
-tf_combined = tf * tf.inverse()  # Returns identity transform
-print(tf_combined.mat44())
+print('--------------')
+print(padded.strides)

@@ -9,7 +9,7 @@ This package provides 2D image transformation functions including:
 - View synthesis and image warping
 """
 
-from .transform import (
+from .img_tf import (
     translation,
     rotation,
     shear,

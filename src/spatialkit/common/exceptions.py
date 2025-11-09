@@ -3,11 +3,11 @@ Module Name: exceptions.py
 
 Description:
 This module defines a hierarchical exception structure for the spatialkit library.
-All custom exceptions inherit from CVUtilsError to enable unified error handling
+All custom exceptions inherit from SpatialKitError to enable unified error handling
 while providing specific error types for different domains and operations.
 
 Exception Hierarchy:
-    CVUtilsError
+    SpatialKitError
     ├── MathError
     │   ├── InvalidDimensionError
     │   ├── InvalidShapeError
@@ -57,7 +57,7 @@ Usage:
     >>> # Library-level exception handling  
     >>> try:
     ...     # any spatialkit operation
-    ... except CVUtilsError as e:
+    ... except SpatialKitError as e:
     ...     print(f"spatialkit error: {e}")
 """
 
@@ -66,7 +66,7 @@ Usage:
 # Base Exception
 # =============================================================================
 
-class CVUtilsError(Exception):
+class SpatialKitError(Exception):
     """
     Base exception for all spatialkit library errors.
     
@@ -75,12 +75,32 @@ class CVUtilsError(Exception):
     """
     pass
 
+class NotArrayLikeError(SpatialKitError):
+    """
+    Exception raised when an input is expected to be array-like but is not.
+    
+    Examples:
+        - Providing a scalar where an array is required
+        - Passing unsupported types (e.g., string, dict) to functions expecting arrays
+    """
+    pass
+
+class InvalidArgumentError(SpatialKitError):
+    """
+    Exception raised when a function receives invalid arguments.
+    
+    Examples:
+        - Arguments out of expected range
+        - Invalid combinations of parameters
+        - Missing required arguments
+    """
+    pass
 
 # =============================================================================
 # Mathematical Operations Exceptions
 # =============================================================================
 
-class MathError(CVUtilsError):
+class MathError(SpatialKitError):
     """
     Base exception for mathematical operations.
     
@@ -155,7 +175,7 @@ class SingularMatrixError(MathError):
 # Geometry Operations Exceptions
 # =============================================================================
 
-class GeometryError(CVUtilsError):
+class GeometryError(SpatialKitError):
     """
     Base exception for geometric operations.
     
@@ -217,7 +237,7 @@ class CalibrationError(GeometryError):
 # Camera Operations Exceptions
 # =============================================================================
 
-class CameraError(CVUtilsError):
+class CameraError(SpatialKitError):
     """
     Base exception for camera-related operations.
     
@@ -268,7 +288,7 @@ class CameraModelError(CameraError):
 # Visualization Exceptions
 # =============================================================================
 
-class VisualizationError(CVUtilsError):
+class VisualizationError(SpatialKitError):
     """
     Base exception for visualization operations.
     
@@ -305,7 +325,7 @@ class DisplayError(VisualizationError):
 # I/O Operations Exceptions
 # =============================================================================
 
-class IOError(CVUtilsError):
+class IOError(SpatialKitError):
     """
     Base exception for input/output operations.
     
@@ -355,7 +375,7 @@ class ReadWriteError(IOError):
 # Marker Detection Exceptions
 # =============================================================================
 
-class MarkerError(CVUtilsError):
+class MarkerError(SpatialKitError):
     """
     Base exception for fiducial marker operations.
     
@@ -402,11 +422,11 @@ def get_exception_hierarchy() -> dict:
         
     Example:
         >>> hierarchy = get_exception_hierarchy()
-        >>> print(hierarchy['CVUtilsError']['MathError'])
+        >>> print(hierarchy['SpatialKitError']['MathError'])
         ['InvalidDimensionError', 'InvalidShapeError', ...]
     """
     return {
-        'CVUtilsError': {
+        'SpatialKitError': {
             'MathError': [
                 'InvalidDimensionError',
                 'InvalidShapeError', 
@@ -452,13 +472,14 @@ def is_spatialkit_error(exception: Exception) -> bool:
     Returns:
         bool: True if exception is from spatialkit, False otherwise.
     """
-    return isinstance(exception, CVUtilsError)
+    return isinstance(exception, SpatialKitError)
 
 
 # Export all exceptions for convenient importing
 __all__ = [
     # Base
-    'CVUtilsError',
+    'SpatialKitError',
+    'NotArrayLikeError',
     
     # Math
     'MathError',

@@ -85,7 +85,7 @@ from .common.logger import LOG_CRITICAL, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WAR
 
 from .common.exceptions import (
     # Base exception
-    CVUtilsError,
+    SpatialKitError,
     # Math exceptions
     MathError,
     InvalidDimensionError,
@@ -162,7 +162,7 @@ __all__ = [
     "LOG_CRITICAL", "LOG_DEBUG", "LOG_ERROR", "LOG_INFO", "LOG_WARN",
 
     # Exceptions
-    "CVUtilsError",
+    "SpatialKitError",
     "MathError", "InvalidDimensionError", "InvalidShapeError",
     "IncompatibleTypeError", "NumericalError", "SingularMatrixError",
     "GeometryError", "ConversionError", "InvalidCoordinateError",

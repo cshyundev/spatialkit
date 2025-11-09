@@ -530,5 +530,400 @@ class TestUmathDtypePromotion(unittest.TestCase):
         self.assertEqual(result.dtype, torch.float64)
 
 
+class TestFloorCeilFunctions(unittest.TestCase):
+    """Tests for floor and ceil functions."""
+
+    def test_floor_numpy(self):
+        """Test floor function with numpy."""
+        x = np.array([1.7, 2.3, -0.5, -1.9])
+        result = umath.floor(x)
+        expected = np.array([1., 2., -1., -2.])
+        np.testing.assert_array_equal(result, expected)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_floor_torch(self):
+        """Test floor function with torch."""
+        x = torch.tensor([1.7, 2.3, -0.5, -1.9])
+        result = umath.floor(x)
+        expected = torch.tensor([1., 2., -1., -2.])
+        torch.testing.assert_close(result, expected)
+
+    def test_ceil_numpy(self):
+        """Test ceil function with numpy."""
+        x = np.array([1.1, 2.9, -0.5, -1.1])
+        result = umath.ceil(x)
+        expected = np.array([2., 3., -0., -1.])
+        np.testing.assert_array_equal(result, expected)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_ceil_torch(self):
+        """Test ceil function with torch."""
+        x = torch.tensor([1.1, 2.9, -0.5, -1.1])
+        result = umath.ceil(x)
+        expected = torch.tensor([2., 3., -0., -1.])
+        torch.testing.assert_close(result, expected)
+
+
+class TestCrossProduct(unittest.TestCase):
+    """Tests for cross product function."""
+
+    def test_cross_numpy_basic(self):
+        """Test cross product with basic 3D vectors."""
+        a = np.array([1, 0, 0])
+        b = np.array([0, 1, 0])
+        result = umath.cross(a, b)
+        expected = np.array([0, 0, 1])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_cross_numpy_batched(self):
+        """Test cross product with batched vectors."""
+        a = np.array([[1, 0, 0], [0, 1, 0]])
+        b = np.array([[0, 1, 0], [0, 0, 1]])
+        result = umath.cross(a, b, dim=-1)
+        expected = np.array([[0, 0, 1], [1, 0, 0]])
+        np.testing.assert_array_equal(result, expected)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_cross_torch_basic(self):
+        """Test cross product with torch tensors."""
+        a = torch.tensor([1.0, 0.0, 0.0])
+        b = torch.tensor([0.0, 1.0, 0.0])
+        result = umath.cross(a, b)
+        expected = torch.tensor([0.0, 0.0, 1.0])
+        torch.testing.assert_close(result, expected)
+
+    def test_cross_invalid_shape(self):
+        """Test that cross raises error for non-3D vectors."""
+        a = np.array([1, 0])  # 2D vector
+        b = np.array([0, 1])
+        with self.assertRaises(spatialkit.InvalidShapeError):
+            umath.cross(a, b)
+
+    def test_cross_type_mismatch(self):
+        """Test that cross raises error for mixed types."""
+        a = np.array([1.0, 0.0, 0.0])
+        if TORCH_AVAILABLE:
+            b = torch.tensor([0.0, 1.0, 0.0])
+            with self.assertRaises(spatialkit.IncompatibleTypeError):
+                umath.cross(a, b)
+
+
+class TestCdist(unittest.TestCase):
+    """Tests for pairwise distance function."""
+
+    def test_cdist_numpy_basic(self):
+        """Test cdist with basic numpy arrays."""
+        x1 = np.array([[0, 0], [1, 1]])
+        x2 = np.array([[0, 0], [2, 2]])
+        result = umath.cdist(x1, x2)
+
+        # Distance from [0,0] to [0,0] is 0, to [2,2] is sqrt(8)
+        # Distance from [1,1] to [0,0] is sqrt(2), to [2,2] is sqrt(2)
+        self.assertEqual(result.shape, (2, 2))
+        self.assertAlmostEqual(result[0, 0], 0.0)
+        self.assertAlmostEqual(result[0, 1], np.sqrt(8))
+        self.assertAlmostEqual(result[1, 0], np.sqrt(2))
+        self.assertAlmostEqual(result[1, 1], np.sqrt(2))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_cdist_torch_basic(self):
+        """Test cdist with torch tensors."""
+        x1 = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
+        x2 = torch.tensor([[0.0, 0.0], [2.0, 2.0]])
+        result = umath.cdist(x1, x2)
+
+        self.assertEqual(result.shape, torch.Size([2, 2]))
+        self.assertTrue(torch.allclose(result[0, 0], torch.tensor(0.0)))
+
+    def test_cdist_different_p_norm(self):
+        """Test cdist with different p values."""
+        x1 = np.array([[0, 0], [1, 1]])
+        x2 = np.array([[0, 0], [2, 2]])
+
+        # Manhattan distance (p=1)
+        result_p1 = umath.cdist(x1, x2, p=1.0)
+        self.assertAlmostEqual(result_p1[0, 1], 4.0)  # |2-0| + |2-0| = 4
+
+    def test_cdist_invalid_dimension(self):
+        """Test that cdist raises error for non-2D arrays."""
+        x1 = np.array([1, 2, 3])  # 1D
+        x2 = np.array([4, 5, 6])
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.cdist(x1, x2)
+
+    def test_cdist_shape_mismatch(self):
+        """Test that cdist raises error for feature dimension mismatch."""
+        x1 = np.array([[1, 2]])  # Shape (1, 2)
+        x2 = np.array([[1, 2, 3]])  # Shape (1, 3)
+        with self.assertRaises(spatialkit.InvalidShapeError):
+            umath.cdist(x1, x2)
+
+
+class TestTopK(unittest.TestCase):
+    """Tests for topk function."""
+
+    def test_topk_numpy_largest(self):
+        """Test topk with numpy array (largest elements)."""
+        x = np.array([[3, 1, 4, 1, 5], [9, 2, 6, 5, 3]])
+        values, indices = umath.topk(x, k=3, dim=1, largest=True)
+
+        self.assertEqual(values.shape, (2, 3))
+        self.assertEqual(indices.shape, (2, 3))
+
+        # For first row, top 3 are: 5, 4, 3
+        np.testing.assert_array_equal(values[0], np.array([5, 4, 3]))
+
+    def test_topk_numpy_smallest(self):
+        """Test topk with numpy array (smallest elements)."""
+        x = np.array([3, 1, 4, 1, 5])
+        values, indices = umath.topk(x, k=2, largest=False)
+
+        # Top 2 smallest: 1, 1
+        self.assertEqual(values.shape, (2,))
+        np.testing.assert_array_equal(values, np.array([1, 1]))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_topk_torch_largest(self):
+        """Test topk with torch tensor."""
+        x = torch.tensor([[3, 1, 4, 1, 5], [9, 2, 6, 5, 3]])
+        values, indices = umath.topk(x, k=3, dim=1, largest=True)
+
+        self.assertEqual(values.shape, torch.Size([2, 3]))
+        torch.testing.assert_close(values[0], torch.tensor([5, 4, 3]))
+
+    def test_topk_dimension_out_of_range(self):
+        """Test that topk raises error for invalid dimension."""
+        x = np.array([1, 2, 3])
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.topk(x, k=2, dim=5)
+
+    def test_topk_k_too_large(self):
+        """Test that topk raises error when k > dim size."""
+        from spatialkit.common.exceptions import InvalidArgumentError
+
+        x = np.array([1, 2, 3])
+        with self.assertRaises(InvalidArgumentError):
+            umath.topk(x, k=10)
+
+
+class TestBMM3D(unittest.TestCase):
+    """Tests for batch matrix multiplication (3D only)."""
+
+    def test_bmm3d_numpy_basic(self):
+        """Test bmm3d with numpy arrays."""
+        # Batch of 2, 3x4 and 4x5 matrices
+        x = np.random.rand(2, 3, 4).astype(np.float32)
+        y = np.random.rand(2, 4, 5).astype(np.float32)
+
+        result = umath.bmm3d(x, y)
+
+        self.assertEqual(result.shape, (2, 3, 5))
+
+        # Verify against manual computation
+        expected = np.einsum('bij,bjk->bik', x, y)
+        np.testing.assert_allclose(result, expected)
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_bmm3d_torch_basic(self):
+        """Test bmm3d with torch tensors."""
+        x = torch.rand(2, 3, 4)
+        y = torch.rand(2, 4, 5)
+
+        result = umath.bmm3d(x, y)
+
+        self.assertEqual(result.shape, torch.Size([2, 3, 5]))
+
+        # Verify against torch.bmm
+        expected = torch.bmm(x, y)
+        torch.testing.assert_close(result, expected)
+
+    def test_bmm3d_invalid_dimension(self):
+        """Test that bmm3d raises error for non-3D arrays."""
+        x = np.random.rand(3, 4)  # 2D
+        y = np.random.rand(4, 5)
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.bmm3d(x, y)
+
+    def test_bmm3d_batch_mismatch(self):
+        """Test that bmm3d raises error for batch size mismatch."""
+        x = np.random.rand(2, 3, 4)
+        y = np.random.rand(3, 4, 5)  # Different batch size
+        with self.assertRaises(spatialkit.InvalidShapeError):
+            umath.bmm3d(x, y)
+
+    def test_bmm3d_inner_dim_mismatch(self):
+        """Test that bmm3d raises error for inner dimension mismatch."""
+        x = np.random.rand(2, 3, 4)
+        y = np.random.rand(2, 5, 6)  # x.shape[2] != y.shape[1]
+        with self.assertRaises(spatialkit.InvalidShapeError):
+            umath.bmm3d(x, y)
+
+
+class TestSVDBatch(unittest.TestCase):
+    """Tests for SVD with batch support."""
+
+    def test_svd_single_matrix(self):
+        """Test SVD with single 2D matrix."""
+        A = np.random.rand(4, 3).astype(np.float32)
+        U, S, Vt = umath.svd(A)
+
+        # Check shapes
+        self.assertEqual(U.shape, (4, 4))
+        self.assertEqual(S.shape, (3,))
+        self.assertEqual(Vt.shape, (3, 3))
+
+        # Verify reconstruction
+        reconstructed = U[:, :3] @ np.diag(S) @ Vt
+        np.testing.assert_allclose(A, reconstructed, atol=1e-5)
+
+    def test_svd_batch_matrices(self):
+        """Test SVD with batch of matrices (3D)."""
+        # Batch of 5 matrices, each 4x3
+        A_batch = np.random.rand(5, 4, 3).astype(np.float32)
+        U, S, Vt = umath.svd(A_batch)
+
+        # Check shapes
+        self.assertEqual(U.shape, (5, 4, 4))
+        self.assertEqual(S.shape, (5, 3))
+        self.assertEqual(Vt.shape, (5, 3, 3))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_svd_batch_torch(self):
+        """Test SVD with batch of torch tensors."""
+        A_batch = torch.rand(5, 4, 3)
+        U, S, Vt = umath.svd(A_batch)
+
+        self.assertEqual(U.shape, torch.Size([5, 4, 4]))
+        self.assertEqual(S.shape, torch.Size([5, 3]))
+        self.assertEqual(Vt.shape, torch.Size([5, 3, 3]))
+
+    def test_svd_invalid_dimension(self):
+        """Test that SVD raises error for 1D or 4D+ arrays."""
+        # 1D array
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.svd(np.array([1, 2, 3]))
+
+        # 4D array
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.svd(np.random.rand(2, 3, 4, 5))
+
+
+class TestMeanEnhancement(unittest.TestCase):
+    """Tests for mean() function with keepdims parameter."""
+
+    def test_mean_numpy_basic(self):
+        """Test basic mean functionality with numpy."""
+        arr = np.array([1, 2, 3, 4, 5])
+        result = umath.mean(arr)
+        self.assertEqual(result, 3.0)
+
+    def test_mean_numpy_with_dim(self):
+        """Test mean with dimension parameter."""
+        arr = np.array([[1, 2, 3], [4, 5, 6]])
+        result = umath.mean(arr, dim=0)
+        expected = np.array([2.5, 3.5, 4.5])
+        self.assertTrue(np.allclose(result, expected))
+
+    def test_mean_numpy_with_keepdims(self):
+        """Test mean with keepdims=True."""
+        arr = np.array([[1, 2, 3], [4, 5, 6]])
+        result = umath.mean(arr, dim=1, keepdims=True)
+        self.assertEqual(result.shape, (2, 1))
+        expected = np.array([[2.0], [5.0]])
+        self.assertTrue(np.allclose(result, expected))
+
+    def test_mean_numpy_without_keepdims(self):
+        """Test mean with keepdims=False (default)."""
+        arr = np.array([[1, 2, 3], [4, 5, 6]])
+        result = umath.mean(arr, dim=1, keepdims=False)
+        self.assertEqual(result.shape, (2,))
+        expected = np.array([2.0, 5.0])
+        self.assertTrue(np.allclose(result, expected))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_mean_torch_basic(self):
+        """Test basic mean functionality with torch."""
+        arr = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = umath.mean(arr)
+        self.assertTrue(torch.isclose(result, torch.tensor(3.0)))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_mean_torch_with_keepdims(self):
+        """Test mean with keepdims=True for torch."""
+        arr = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        result = umath.mean(arr, dim=1, keepdims=True)
+        self.assertEqual(result.shape, (2, 1))
+        expected = torch.tensor([[2.0], [5.0]])
+        self.assertTrue(torch.allclose(result, expected))
+
+    def test_mean_dimension_out_of_range(self):
+        """Test that mean raises error for out of range dimension."""
+        arr = np.array([1, 2, 3])
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.mean(arr, dim=5)
+
+    def test_min_basic(self):
+        """Test min function with basic inputs."""
+        # NumPy
+        arr_np = np.array([[1, 5, 3], [4, 2, 6]])
+        self.assertEqual(umath.min(arr_np), 1)
+        np.testing.assert_array_equal(umath.min(arr_np, dim=0), np.array([1, 2, 3]))
+        np.testing.assert_array_equal(umath.min(arr_np, dim=1), np.array([1, 2]))
+
+        # PyTorch
+        if TORCH_AVAILABLE:
+            arr_torch = torch.tensor([[1, 5, 3], [4, 2, 6]])
+            self.assertEqual(umath.min(arr_torch).item(), 1)
+            torch.testing.assert_close(umath.min(arr_torch, dim=0), torch.tensor([1, 2, 3]))
+            torch.testing.assert_close(umath.min(arr_torch, dim=1), torch.tensor([1, 2]))
+
+    def test_min_keepdims(self):
+        """Test min with keepdims parameter."""
+        arr_np = np.array([[1, 5], [4, 2]])
+        result = umath.min(arr_np, dim=0, keepdims=True)
+        self.assertEqual(result.shape, (1, 2))
+        np.testing.assert_array_equal(result, np.array([[1, 2]]))
+
+        if TORCH_AVAILABLE:
+            arr_torch = torch.tensor([[1, 5], [4, 2]])
+            result = umath.min(arr_torch, dim=0, keepdims=True)
+            self.assertEqual(result.shape, torch.Size([1, 2]))
+
+    def test_max_basic(self):
+        """Test max function with basic inputs."""
+        # NumPy
+        arr_np = np.array([[1, 5, 3], [4, 2, 6]])
+        self.assertEqual(umath.max(arr_np), 6)
+        np.testing.assert_array_equal(umath.max(arr_np, dim=0), np.array([4, 5, 6]))
+        np.testing.assert_array_equal(umath.max(arr_np, dim=1), np.array([5, 6]))
+
+        # PyTorch
+        if TORCH_AVAILABLE:
+            arr_torch = torch.tensor([[1, 5, 3], [4, 2, 6]])
+            self.assertEqual(umath.max(arr_torch).item(), 6)
+            torch.testing.assert_close(umath.max(arr_torch, dim=0), torch.tensor([4, 5, 6]))
+            torch.testing.assert_close(umath.max(arr_torch, dim=1), torch.tensor([5, 6]))
+
+    def test_max_keepdims(self):
+        """Test max with keepdims parameter."""
+        arr_np = np.array([[1, 5], [4, 2]])
+        result = umath.max(arr_np, dim=0, keepdims=True)
+        self.assertEqual(result.shape, (1, 2))
+        np.testing.assert_array_equal(result, np.array([[4, 5]]))
+
+        if TORCH_AVAILABLE:
+            arr_torch = torch.tensor([[1, 5], [4, 2]])
+            result = umath.max(arr_torch, dim=0, keepdims=True)
+            self.assertEqual(result.shape, torch.Size([1, 2]))
+
+    def test_min_max_dimension_out_of_range(self):
+        """Test that min/max raise error for out of range dimension."""
+        arr = np.array([1, 2, 3])
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.min(arr, dim=5)
+        with self.assertRaises(spatialkit.InvalidDimensionError):
+            umath.max(arr, dim=5)
+
+
 if __name__ == '__main__':
     unittest.main()
