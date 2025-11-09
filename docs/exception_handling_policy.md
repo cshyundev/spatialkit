@@ -377,5 +377,5 @@ def validate_rotation_matrix(R: ArrayLike) -> None:
 
 ## Version History
 
-- **v1.0.0** (2025-11-03): Updated for current spatialkit structure, renamed from CVUtilsError to SpatialKitError
+- **v1.0.0** (2025-11-03): Updated for current spatialkit structure, renamed from SpatialKitError to SpatialKitError
 - **v0.9.0** (2025-01-30): Initial comprehensive exception hierarchy

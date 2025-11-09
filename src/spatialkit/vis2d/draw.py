@@ -9,6 +9,8 @@ Functions:
     - draw_line_by_line: Draw lines specified by line equation
     - draw_polygon: Draw polygons
     - draw_lines: Draw multiple lines
+    - draw_bbox: Draw bounding boxes with labels and confidence scores
+    - draw_segmentation_mask: Draw segmentation masks with transparency
 
 Author: Sehyun Cha
 Email: cshyundev@gmail.com
@@ -298,6 +300,193 @@ def draw_lines(
         raise RenderingError(
             f"Failed to draw lines connecting {len(pts)} points: {e}. "
             f"Please check point coordinates are valid."
+        ) from e
+
+
+def draw_bbox(
+    image: np.ndarray,
+    bbox: Tuple[int, int, int, int],
+    label: Optional[str] = None,
+    confidence: Optional[float] = None,
+    rgb: Optional[Tuple[int, int, int]] = None,
+    thickness: int = 2,
+    font_scale: float = 0.5,
+    font_thickness: int = 1,
+) -> np.ndarray:
+    """
+    Draws a bounding box with optional label and confidence score on the image.
+
+    Args:
+        image (np.ndarray, [H,W,3] or [H,W]): Input image array.
+        bbox (Tuple[int, int, int, int]): Bounding box coordinates (x1, y1, x2, y2) where
+            (x1, y1) is top-left corner and (x2, y2) is bottom-right corner.
+        label (Optional[str]): Class label to display above the bounding box.
+        confidence (Optional[float]): Confidence score (0.0-1.0) to display with the label.
+        rgb (Optional[Tuple[int, int, int]]): Color of the bounding box in RGB. Default is random.
+        thickness (int): Thickness of the bounding box lines. Default is 2.
+        font_scale (float): Font scale for label text. Default is 0.5.
+        font_thickness (int): Thickness of the label text. Default is 1.
+
+    Returns:
+        np.ndarray: Image with the drawn bounding box.
+
+    Raises:
+        InvalidDimensionError: If image is not 2D or 3D array.
+        ValueError: If bbox coordinates are invalid or confidence is out of range.
+        RenderingError: If drawing fails.
+
+    Example:
+        >>> image_with_bbox = draw_bbox(image, (10, 10, 100, 100), label="person", confidence=0.95)
+    """
+    if not isinstance(image, np.ndarray) or len(image.shape) not in [2, 3]:
+        raise InvalidDimensionError(
+            f"Image must be 2D or 3D numpy array, got {type(image)} with shape {getattr(image, 'shape', 'unknown')}. "
+            f"Please provide a valid image array."
+        )
+
+    if len(bbox) != 4:
+        raise ValueError(
+            f"Bounding box must have 4 coordinates (x1, y1, x2, y2), got {len(bbox)} values. "
+            f"Please provide valid bounding box coordinates."
+        )
+
+    x1, y1, x2, y2 = bbox
+    if x1 >= x2 or y1 >= y2:
+        raise ValueError(
+            f"Invalid bounding box coordinates: ({x1}, {y1}, {x2}, {y2}). "
+            f"Ensure x1 < x2 and y1 < y2."
+        )
+
+    if confidence is not None and not (0.0 <= confidence <= 1.0):
+        raise ValueError(
+            f"Confidence score must be between 0.0 and 1.0, got {confidence}. "
+            f"Please provide a valid confidence score."
+        )
+
+    try:
+        if rgb is None:
+            rgb = tuple(np.random.randint(0, 255, 3).tolist())
+
+        # Draw bounding box rectangle
+        pt1 = (int(x1), int(y1))
+        pt2 = (int(x2), int(y2))
+        cv.rectangle(image, pt1, pt2, rgb, thickness)
+
+        # Draw label and confidence if provided
+        if label is not None or confidence is not None:
+            text_parts = []
+            if label is not None:
+                text_parts.append(label)
+            if confidence is not None:
+                text_parts.append(f"{confidence:.2f}")
+            text = " ".join(text_parts)
+
+            # Calculate text size for background
+            (text_width, text_height), baseline = cv.getTextSize(
+                text, cv.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness
+            )
+
+            # Draw filled rectangle as background for text
+            text_bg_pt1 = (int(x1), int(y1) - text_height - baseline - 5)
+            text_bg_pt2 = (int(x1) + text_width + 5, int(y1))
+            cv.rectangle(image, text_bg_pt1, text_bg_pt2, rgb, -1)
+
+            # Draw text
+            text_org = (int(x1) + 2, int(y1) - baseline - 2)
+            cv.putText(
+                image,
+                text,
+                text_org,
+                cv.FONT_HERSHEY_SIMPLEX,
+                font_scale,
+                (255, 255, 255),
+                font_thickness,
+                cv.LINE_AA,
+            )
+
+        return image
+    except Exception as e:
+        raise RenderingError(
+            f"Failed to draw bounding box at {bbox}: {e}. "
+            f"Please check coordinates are within image bounds."
+        ) from e
+
+
+def draw_segmentation_mask(
+    image: np.ndarray,
+    mask: np.ndarray,
+    rgb: Optional[Tuple[int, int, int]] = None,
+    alpha: float = 0.5,
+) -> np.ndarray:
+    """
+    Draws a segmentation mask overlay on the image with transparency.
+
+    Args:
+        image (np.ndarray, [H,W,3]): Input image array (must be 3-channel RGB/BGR).
+        mask (np.ndarray, [H,W]): Binary segmentation mask where non-zero pixels are masked.
+            Can be boolean or integer array.
+        rgb (Optional[Tuple[int, int, int]]): Color of the mask overlay in RGB. Default is random.
+        alpha (float): Transparency of the mask overlay (0.0-1.0).
+            0.0 is fully transparent, 1.0 is fully opaque. Default is 0.5.
+
+    Returns:
+        np.ndarray: Image with the segmentation mask overlay.
+
+    Raises:
+        InvalidDimensionError: If image is not 3D array or mask is not 2D array.
+        ValueError: If image and mask shapes don't match or alpha is out of range.
+        RenderingError: If mask drawing fails.
+
+    Example:
+        >>> mask = np.zeros((480, 640), dtype=bool)
+        >>> mask[100:200, 100:200] = True
+        >>> image_with_mask = draw_segmentation_mask(image, mask, rgb=(255, 0, 0), alpha=0.6)
+    """
+    if not isinstance(image, np.ndarray) or len(image.shape) != 3:
+        raise InvalidDimensionError(
+            f"Image must be 3D numpy array (H,W,3), got {type(image)} with shape {getattr(image, 'shape', 'unknown')}. "
+            f"Please provide a valid RGB/BGR image array."
+        )
+
+    if not isinstance(mask, np.ndarray) or len(mask.shape) != 2:
+        raise InvalidDimensionError(
+            f"Mask must be 2D numpy array (H,W), got {type(mask)} with shape {getattr(mask, 'shape', 'unknown')}. "
+            f"Please provide a valid binary mask array."
+        )
+
+    if image.shape[:2] != mask.shape:
+        raise ValueError(
+            f"Image and mask dimensions must match. "
+            f"Got image shape {image.shape[:2]} and mask shape {mask.shape}. "
+            f"Please ensure both have the same height and width."
+        )
+
+    if not (0.0 <= alpha <= 1.0):
+        raise ValueError(
+            f"Alpha must be between 0.0 and 1.0, got {alpha}. "
+            f"Please provide a valid transparency value."
+        )
+
+    try:
+        if rgb is None:
+            rgb = tuple(np.random.randint(0, 255, 3).tolist())
+
+        # Create colored mask overlay
+        colored_mask = np.zeros_like(image)
+        colored_mask[mask > 0] = rgb
+
+        # Blend the mask with the original image
+        result = image.copy()
+        mask_area = mask > 0
+        result[mask_area] = (
+            alpha * colored_mask[mask_area] + (1 - alpha) * image[mask_area]
+        ).astype(np.uint8)
+
+        return result
+    except Exception as e:
+        raise RenderingError(
+            f"Failed to draw segmentation mask: {e}. "
+            f"Please check image and mask are compatible."
         ) from e
 
 

@@ -18,11 +18,13 @@ from .display import show_correspondences, show_image, show_two_images
 
 # Drawing utilities
 from .draw import (
+    draw_bbox,
     draw_circle,
     draw_line_by_line,
     draw_line_by_points,
     draw_lines,
     draw_polygon,
+    draw_segmentation_mask,
 )
 
 __all__ = [
@@ -37,9 +39,11 @@ __all__ = [
     "show_image",
     "show_two_images",
     # Draw
+    "draw_bbox",
     "draw_circle",
     "draw_line_by_line",
     "draw_line_by_points",
     "draw_lines",
     "draw_polygon",
+    "draw_segmentation_mask",
 ]

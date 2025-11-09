@@ -31,7 +31,6 @@ from ..common.exceptions import (
     InvalidShapeError,
     IncompatibleTypeError,
     InvalidDimensionError,
-    GeometryError
 )
 
 
@@ -207,9 +206,9 @@ def compute_homography(
         mat (np.ndarray, [3,3]): The computed homography matrix.
     """
     if isinstance(pts1, List):
-        pts1 = np.array(pts1, dtype=float)
+        pts1 = np.array(pts1, dtype=np.float64)
     if isinstance(pts2, List):
-        pts2 = np.array(pts2, dtype=float)
+        pts2 = np.array(pts2, dtype=np.float64)
         
     if not isinstance(pts1, type(pts2)):
         raise IncompatibleTypeError(

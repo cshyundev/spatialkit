@@ -53,6 +53,16 @@ from .multiview import (
 from .pointcloud import (
     convert_point_cloud_to_depth,
     convert_depth_to_point_cloud,
+    down_sample_point_cloud,
+    compute_point_cloud_normals,
+    depth_to_normal_map,
+)
+
+from .registration import (
+    icp,
+    icp_point_to_point,
+    icp_point_to_plane,
+    icp_generalized,
 )
 
 __all__ = [
@@ -89,5 +99,14 @@ __all__ = [
     # Point cloud functions
     "convert_point_cloud_to_depth",
     "convert_depth_to_point_cloud",
+    "down_sample_point_cloud",
+    "compute_point_cloud_normals",
+    "depth_to_normal_map",
+
+    # Registration functions
+    "icp",
+    "icp_point_to_point",
+    "icp_point_to_plane",
+    "icp_generalized",
 ]
 
