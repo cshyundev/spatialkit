@@ -1,428 +1,199 @@
-# Project Code Convention Documentation
+# Code Convention
 
 **Last Updated:** 2025-11-03
-**Version:** 0.3.0-alpha
+**Current Version:** 0.3.2
 
-This document defines the coding conventions for the spatialkit project.
+This document outlines the code conventions and style guidelines for the project. Adhering to these conventions ensures consistency, readability, and maintainability across the codebase.
 
-## Naming Conventions
+## 1. Python Style Guide (PEP 8)
 
-### Packages
-- Package names are all lowercase.
-- Do not use underscores between words; use short, clear names.
-- Examples: `ops`, `geom`, `camera`, `markers`, `vis2d`, `vis3d`
+All Python code must adhere to [PEP 8](https://www.python.org/dev/peps/pep-0008/) – the official Python style guide.
 
-### Modules
-- Module file names are all lowercase with underscores separating words.
-- Module names should clearly indicate their functionality.
-- Examples: `uops.py`, `umath.py`, `img_tf.py`, `geom_utils.py`, `point_selector.py`
+### Key PEP 8 Guidelines:
 
-### Classes
-- Class names use PascalCase.
-- Class names should clearly indicate the role and function of the class.
-- Internal-only variables and functions are prefixed with an underscore (_).
-- Examples: `Rotation`, `Pose`, `Transform`, `PerspectiveCamera`, `MarkerDetector`
+- **Indentation**: 4 spaces per indentation level.
+- **Line Length**: Max 79 characters for code, 72 for docstrings/comments.
+- **Blank Lines**:
+    - Two blank lines between top-level function/class definitions.
+    - One blank line between method definitions inside a class.
+- **Imports**:
+    - Imports should be on separate lines.
+    - Grouped in the following order:
+        1. Standard library imports
+        2. Third-party imports
+        3. Local application/library specific imports
+    - Each group separated by a blank line.
+    - Alphabetical order within each group.
+- **Whitespace**: Avoid extraneous whitespace.
+- **Naming Conventions**:
+    - `lowercase_with_underscores` for functions, methods, variables.
+    - `CamelCase` for classes.
+    - `UPPERCASE_WITH_UNDERSCORES` for constants.
+    - `_single_leading_underscore` for internal use (private).
+    - `__double_leading_underscore` for name mangling (avoid if possible).
 
-### Variables
-- Variable names use snake_case.
-- Variable names should clearly indicate the role and function of the variable.
-- Constant names are all uppercase with underscores separating words.
-- Examples: `focal_length`, `image_size`, `rotation_matrix`
-- Constants: `PI`, `ROTATION_SO3_THRESHOLD`, `DEFAULT_FOV`
+## 2. Type Hinting (PEP 484)
 
-### Functions
-- Function names use snake_case.
-- Function names should clearly indicate the role and function of the function.
-- Private/internal functions are prefixed with an underscore (_).
-- Examples: `is_SO3`, `quat_to_SO3`, `triangulate_points`, `read_image`
-- Private: `_validate_shape`, `_assert_same_type`
+All new code and modifications should use type hints to improve code clarity, enable static analysis, and reduce bugs.
 
-## Documentation Style
+### Guidelines:
 
-### Functions
-- Function documentation follows the format shown below.
-- Documentation may be omitted if the function's behavior is simple or self-evident.
-- Documentation is placed at the top of the function body.
-
-#### Components
-1. Brief description
-2. Function arguments (Args)
-3. Function returns (Returns)
-4. Exceptions raised (Raises) - **REQUIRED** if any exceptions are raised
-5. Detailed behavior explanation (Details) - Optional
-6. Usage examples (Example) - Optional
+- Use type hints for function arguments, return values, and variables.
+- Use `typing` module for complex types (e.g., `List`, `Dict`, `Optional`, `Union`, `Callable`).
+- For internal use, type aliases can be defined in `spatialkit.common.types`.
+- For NumPy and PyTorch arrays, use `np.ndarray` and `torch.Tensor` respectively.
+- For geometry classes, use the class names directly (e.g., `Rotation`, `Pose`).
 
 ```python
-def function_name(param1: type, param2: type) -> return_type:
+from typing import List, Optional, Union
+import numpy as np
+import torch
+
+def process_data(data: Union[np.ndarray, torch.Tensor], threshold: float) -> List[float]:
     """
-    Brief description of what the function does.
+    Processes input data based on a given threshold.
+    """
+    if isinstance(data, np.ndarray):
+        filtered_data = data[data > threshold]
+    else:
+        filtered_data = data[data > threshold]
+    return filtered_data.tolist()
+
+class MyClass:
+    def __init__(self, name: str, value: Optional[int] = None):
+        self.name: str = name
+        self.value: Optional[int] = value
+```
+
+## 3. Docstrings (PEP 257)
+
+All modules, classes, functions, and methods must have docstrings following the [Google Style Guide](https://google.github.io/styleguide/pyguide.html#pyguide-documenting-code-docstrings).
+
+### Guidelines:
+
+- Use triple double quotes `"""Docstring goes here."""`.
+- One-liner docstrings for simple cases.
+- Multi-line docstrings for complex cases:
+    - Summary line.
+    - Blank line.
+    - Detailed explanation.
+    - Sections for `Args`, `Returns`, `Raises`, `Yields`, `Attributes`, `Example`.
+
+```python
+def calculate_sum(a: int, b: int) -> int:
+    """Calculates the sum of two integers.
 
     Args:
-        param1 (type, shape): Description of param1.
-        param2 (type, shape): Description of param2.
+        a: The first integer.
+        b: The second integer.
 
     Returns:
-        return_type (type, shape): Description of the return value.
-
-    Raises:
-        ExceptionType1: When and why this exception is raised.
-        ExceptionType2: When and why this exception is raised.
-
-    Details:
-        - Explanation of the first key detail.
-        - Explanation of the second key detail.
-
-    Example:
-        >>> result = function_name(value1, value2)
-        >>> result.shape
-        (3, 3)
+        The sum of a and b.
     """
-    ...
-```
+    return a + b
 
-**Important Notes:**
-- The `Raises:` section is **mandatory** when the function raises any exceptions
-- Always document all possible exceptions that can be raised
-- Include specific conditions under which each exception is raised
-- Use descriptive exception types from the spatialkit exception hierarchy
-
-### Classes
-- Class documentation follows the format shown below.
-- Documentation is placed at the top of the `__init__` function.
-
-#### Components
-1. Brief description
-2. Class member variables (Attributes)
-3. Abstract methods (Abstract Methods) - Optional
-
-```python
-class ClassName:
-    """
-    Brief description of what the class does.
+class MyProcessor:
+    """A class for processing numerical data.
 
     Attributes:
-        attr1 (type, shape): Description of attr1.
-        attr2 (type, shape): Description of attr2.
-
-    Abstract Methods:
-        abstract_method1: Description of abstract_method1.
-        abstract_method2: Description of abstract_method2.
+        data: The data to be processed.
     """
-    def __init__(self, ...):
-        ...
+    def __init__(self, data: np.ndarray):
+        self.data = data
+
+    def process(self) -> np.ndarray:
+        """Processes the stored data.
+
+        Returns:
+            The processed data.
+        """
+        return self.data * 2
 ```
 
-**For classes with complex initialization:**
+## 4. Comments
+
+Use comments sparingly to explain *why* a piece of code does something, rather than *what* it does (which should be clear from the code itself).
+
+### Guidelines:
+
+- Use `#` for inline comments.
+- Keep comments concise and up-to-date.
+- Avoid redundant comments.
+
 ```python
-class PerspectiveCamera(Camera):
-    """
-    Perspective (pinhole) camera model.
-
-    Attributes:
-        K (np.ndarray, (3, 3)): Camera intrinsic matrix.
-        image_size (tuple[int, int]): Image size (width, height).
-        dist_coeffs (np.ndarray | None): Distortion coefficients if applicable.
-
-    Raises:
-        InvalidCameraParameterError: If K matrix is invalid or focal lengths are non-positive.
-    """
+# This loop iterates until convergence is reached,
+# which is crucial for the stability of the optimization algorithm.
+while not converged:
+    # ...
 ```
 
-### Modules
-- Module documentation follows the format shown below.
-- Documentation is placed at the very top of the file.
+## 5. Error Handling
 
-#### Components
-1. Module name
-2. Brief description of the module
-3. Main functions and supported types (Optional)
-4. Author information
-5. License information
-6. Usage examples
+Use Python's exception mechanism for error handling. Avoid returning `None` or special values to indicate errors.
+
+### Guidelines:
+
+- Raise specific exceptions (e.g., `ValueError`, `TypeError`, `FileNotFoundError`).
+- Define custom exceptions for domain-specific errors (see `spatialkit.common.exceptions`).
+- Use `try...except` blocks to handle expected errors gracefully.
+- Avoid broad `except Exception:` clauses unless absolutely necessary and re-raising.
 
 ```python
-"""
-Module Name: module_name.py
+from spatialkit.common.exceptions import InvalidArgumentError
 
-Description:
-Brief description of what this module provides.
-
-Main Functions:
-- function1: Description
-- function2: Description
-
-Supported Types:
-- NumPy arrays
-- PyTorch tensors
-
-Author: Author Name
-Email: email@example.com
-Version: x.x.x
-
-License: MIT License
-
-Usage:
-    from spatialkit.package import module_name
-    result = module_name.function(...)
-"""
+def divide(a: float, b: float) -> float:
+    if b == 0:
+        raise InvalidArgumentError("Cannot divide by zero.")
+    return a / b
 ```
 
-## Type Hints
+## 6. Logging
 
-### General Guidelines
-- All function signatures should include type hints for parameters and return values
-- Use standard typing module imports: `from typing import Optional, Union, Tuple, List`
-- Use newer Python 3.10+ syntax when available: `list[int]` instead of `List[int]`
+Use the `logging` module for reporting events, debugging information, warnings, and errors.
 
-### Array Type Hints
-For functions working with both NumPy and PyTorch:
-```python
-from spatialkit.ops.uops import ArrayLike
+### Guidelines:
 
-def process_array(arr: ArrayLike) -> ArrayLike:
-    """Process array (NumPy or PyTorch)."""
-    ...
-```
-
-### Specific Type Hints
-```python
-# For NumPy arrays
-import numpy as np
-
-def numpy_function(arr: np.ndarray) -> np.ndarray:
-    ...
-
-# For PyTorch tensors
-import torch
-
-def torch_function(tensor: torch.Tensor) -> torch.Tensor:
-    ...
-
-# For optional parameters
-def function(param: int | None = None) -> float:
-    ...
-
-# For multiple return values
-def decompose() -> tuple[np.ndarray, np.ndarray]:
-    ...
-```
-
-## Code Organization
-
-### Import Order
-1. Standard library imports
-2. Third-party library imports (numpy, torch, cv2, etc.)
-3. Local application imports
+- Import `spatialkit.common.logger` for consistent logging.
+- Use appropriate logging levels (`debug`, `info`, `warning`, `error`, `critical`).
+- Avoid `print()` statements for debugging in production code.
 
 ```python
-# Standard library
-import os
-from pathlib import Path
-from typing import Optional
+from spatialkit.common.logger import LOG_INFO, LOG_ERROR
 
-# Third-party
-import numpy as np
-import torch
-import cv2
-
-# Local
-from ..common.exceptions import InvalidDimensionError
-from ..ops.uops import is_tensor, convert_array
-```
-
-### Module Structure
-1. Module docstring
-2. Imports
-3. Constants/globals
-4. Private helper functions
-5. Public API functions/classes
-6. `__all__` declaration at the end
-
-```python
-"""Module docstring."""
-
-# Imports
-import numpy as np
-from ..common.exceptions import MathError
-
-# Constants
-DEFAULT_TOLERANCE = 1e-6
-
-# Private functions
-def _validate_input(x):
-    ...
-
-# Public API
-def public_function(x):
-    ...
-
-class PublicClass:
-    ...
-
-# Public API declaration
-__all__ = ["public_function", "PublicClass"]
-```
-
-## Exception Handling
-
-### Never Use Assert for User Input
-```python
-# ❌ WRONG
-def qr(x: ArrayLike) -> ArrayLike:
-    assert x.ndim == 2, f"Expected 2D matrix, got {x.shape}"
-    return np.linalg.qr(x)
-
-# ✅ CORRECT
-from ..common.exceptions import InvalidDimensionError, NumericalError
-
-def qr(x: ArrayLike) -> tuple[ArrayLike, ArrayLike]:
-    """
-    Compute QR decomposition.
-
-    Raises:
-        InvalidDimensionError: If input is not a 2D matrix.
-        NumericalError: If QR decomposition fails.
-    """
-    if x.ndim != 2:
-        raise InvalidDimensionError(
-            f"QR decomposition requires 2D matrix, got {x.ndim}D array with shape {x.shape}. "
-            f"Please ensure input is a 2D matrix."
-        )
-
+def load_config(path: str) -> dict:
     try:
-        return np.linalg.qr(x) if is_numpy(x) else torch.linalg.qr(x)
-    except Exception as e:
-        raise NumericalError(f"QR decomposition failed: {e}") from e
+        # ... load config ...
+        LOG_INFO(f"Configuration loaded from {path}")
+        return config
+    except FileNotFoundError:
+        LOG_ERROR(f"Configuration file not found at {path}")
+        raise
 ```
 
-### Use Descriptive Exception Messages
-Exception messages should:
-- Clearly state what went wrong
-- Provide context (shapes, values, types)
-- Suggest how to fix the issue
-- Use consistent formatting
+## 7. Imports
 
-```python
-# Good exception message
-raise InvalidShapeError(
-    f"Matrix multiplication requires compatible shapes: A{A.shape} @ B{B.shape}. "
-    f"Expected A.shape[-1] == B.shape[0], but got {A.shape[-1]} != {B.shape[0]}. "
-    f"Consider reshaping or transposing one of the matrices."
-)
-```
+Follow the import pattern defined in `docs/import_pattern.md`.
 
-## Validation Patterns
+### Guidelines:
 
-### Standard Validation Order
-1. Type validation (is it an array?)
-2. Dimension validation (is it 2D?)
-3. Shape validation (is it 3x3?)
-4. Value validation (is det=1? is it orthogonal?)
+- Use absolute imports for internal modules.
+- Avoid circular dependencies.
+- Use `from __future__ import annotations` for postponed evaluation of type annotations.
 
-```python
-from ..common.exceptions import (
-    IncompatibleTypeError,
-    InvalidDimensionError,
-    InvalidShapeError,
-    NumericalError
-)
+## 8. Testing
 
-def validate_rotation_matrix(R: ArrayLike) -> None:
-    # 1. Type validation
-    if not is_array(R):
-        raise IncompatibleTypeError(
-            f"Expected NumPy array or PyTorch tensor, got {type(R)}"
-        )
+All new features and bug fixes must be accompanied by unit tests.
 
-    # 2. Dimension validation
-    if R.ndim != 2:
-        raise InvalidDimensionError(
-            f"Rotation matrix must be 2D, got {R.ndim}D array"
-        )
+### Guidelines:
 
-    # 3. Shape validation
-    if R.shape != (3, 3):
-        raise InvalidShapeError(
-            f"Rotation matrix must be 3x3, got shape {R.shape}"
-        )
+- Use `pytest` framework.
+- Test files should mirror the `src` directory structure (e.g., `tests/geom/test_rotation.py`).
+- Test functions should start with `test_`.
+- Use descriptive test names.
+- Aim for high test coverage.
 
-    # 4. Value validation
-    det = np.linalg.det(R) if is_numpy(R) else torch.det(R)
-    if abs(det - 1.0) > 1e-6:
-        raise NumericalError(
-            f"Rotation matrix must have determinant 1, got {det:.6f}"
-        )
-```
+## 9. Version History
 
-## Performance Considerations
-
-### Array Operations
-- Prefer vectorized operations over loops
-- Use in-place operations when appropriate (with care for mutability)
-- Avoid unnecessary array copies
-
-```python
-# ✅ GOOD - Vectorized
-result = np.sqrt(arr ** 2 + 1)
-
-# ❌ BAD - Loop
-result = np.array([np.sqrt(x**2 + 1) for x in arr])
-```
-
-### Type Checking
-- Cache type checks when performing multiple operations
-- Use `isinstance` for Python types, custom functions for array types
-
-```python
-# ✅ GOOD - Check once
-is_torch = is_tensor(x)
-if is_torch:
-    result = torch.matmul(torch.inv(A), b)
-else:
-    result = np.linalg.solve(A, b)
-
-# ❌ BAD - Repeated checks
-if is_tensor(x):
-    A_inv = torch.inv(A)
-if is_tensor(x):
-    result = torch.matmul(A_inv, b)
-```
-
-## Testing Conventions
-
-### Test File Organization
-- Test files mirror the source structure: `src/spatialkit/ops/umath.py` → `tests/ops/test_umath.py`
-- Use descriptive test function names: `test_qr_decomposition_square_matrix`
-- Group related tests using classes or pytest marks
-
-### Test Function Pattern
-```python
-import pytest
-import numpy as np
-from spatialkit.ops.umath import qr
-from spatialkit.common.exceptions import InvalidDimensionError
-
-def test_qr_square_matrix():
-    """Test QR decomposition on square matrix."""
-    A = np.random.randn(3, 3)
-    Q, R = qr(A)
-
-    # Verify Q is orthogonal
-    assert np.allclose(Q @ Q.T, np.eye(3))
-
-    # Verify reconstruction
-    assert np.allclose(Q @ R, A)
-
-def test_qr_invalid_dimension():
-    """Test QR raises exception for non-2D input."""
-    A = np.array([1, 2, 3])
-
-    with pytest.raises(InvalidDimensionError):
-        qr(A)
-```
-
-## Version History
-
-- **v0.3.0-alpha** (2025-11-03): Updated for new package structure, added exception handling guidelines
-- **v0.2.1-alpha** (2025-01-30): Added type hints and validation patterns
-- **v0.2.0-alpha** (2024-12): Initial code conventions
+- **v0.3.0-alpha** (2025-11-03): Initial draft, basic PEP 8, type hinting, docstring guidelines.
+- **v0.2.1-alpha** (2025-01-30): Added exception handling and logging guidelines.
+- **v0.2.0-alpha** (2024-12): Added import pattern and testing guidelines.

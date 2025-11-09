@@ -1,7 +1,7 @@
 # Project Architecture and Dependency Documentation
 
 **Last Updated:** 2025-11-03
-**Version:** 0.3.0-alpha
+**Current Version:** 0.3.2
 
 This document describes the project's architectural structure, the roles of each package, and their dependencies. This information helps understand the design intent and the interaction between components.
 

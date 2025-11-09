@@ -7,7 +7,7 @@ This module helps to write agnostic code that can handle both Numpy arrays and T
 
 Author: Sehyun Cha
 Email: cshyundev@gmail.com
-Version: 0.2.1-alpha
+Version: 0.3.2
 
 License: MIT LICENSE
 

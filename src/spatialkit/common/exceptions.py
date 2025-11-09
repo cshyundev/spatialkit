@@ -36,7 +36,7 @@ Exception Hierarchy:
 
 Author: Sehyun Cha
 Email: cshyundev@gmail.com
-Version: 0.3.0-alpha
+Version: 0.3.2
 License: MIT LICENSE
 
 Usage:

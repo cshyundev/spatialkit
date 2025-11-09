@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spatialkit"
-version = "0.3.1"
+version = "0.3.2"
 description = "A spatial computing toolkit for 3D vision and robotics"
 authors = [
     {name = "Sehyun Cha", email = "cshyundev@gmail.com"}

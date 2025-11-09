@@ -17,7 +17,7 @@ Package Structure:
     vis3d: 3D visualization with Open3D
 """
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 # ==============================================================================
 # Core Package Modules (import as modules for organized access)

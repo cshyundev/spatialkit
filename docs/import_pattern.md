@@ -1,7 +1,7 @@
 # Import Pattern Documentation
 
 **Last Updated:** 2025-11-03
-**Version:** 0.3.0-alpha
+**Current Version:** 0.3.2
 
 This document describes the hierarchical import pattern used in spatialkit. This pattern was designed to provide both organized access through module namespaces and convenient direct access to frequently used classes.
 

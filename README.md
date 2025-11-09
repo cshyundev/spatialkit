@@ -1,7 +1,7 @@
 # spatialkit
 
-**Current Version:** 0.3.0-alpha
-**Last Updated:** November 1, 2025
+**Current Version:** 0.3.2 \
+**Last Updated:** November 9, 2025
 
 ## License
 
@@ -25,12 +25,13 @@
 ## Caution
 
 - **Performance and Efficiency Issues**: Some features may be slower than existing OpenCV or other libraries, so caution should be exercised when used in research and development where optimization and speed are important.
+- **Limited PyTorch Support in Some Functions**: Certain functions can only receive NumPy input. This is due to the complexity of implementing them efficiently in PyTorch and the limited practical need for PyTorch support in those specific cases.
 
 ## Getting Started (Development Mode)
 
 ### Requirements
 
-- **Python Version**: Python >= 3.12
+- **Python Version**: Python >= 3.10
 - **Package Manager**: uv (recommended) or pip
 - **Dependencies**: All required dependencies will be automatically installed during installation
 
@@ -49,7 +50,7 @@
 
 3. Create virtual environment and install dependencies
    ```bash
-   uv venv --python 3.12
+   uv venv --python 3.10
    source .venv/bin/activate  # Linux/Mac
    # .venv\Scripts\activate   # Windows
    uv pip install -e .
