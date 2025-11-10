@@ -486,6 +486,69 @@ class TestDtypeUtilities(unittest.TestCase):
         with self.assertRaises(spatialkit.IncompatibleTypeError):
             uops.promote_types(arr_np, arr_torch)
 
+    def test_astype_like_numpy(self):
+        """Test astype_like with numpy arrays."""
+        # Test float64 -> float32
+        x_f64 = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        ref_f32 = np.array([0.0], dtype=np.float32)
+        result = uops.astype_like(x_f64, ref_f32)
+        self.assertEqual(result.dtype, np.float32)
+        np.testing.assert_array_equal(result, x_f64.astype(np.float32))
+
+        # Test float32 -> float64
+        x_f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        ref_f64 = np.array([0.0], dtype=np.float64)
+        result = uops.astype_like(x_f32, ref_f64)
+        self.assertEqual(result.dtype, np.float64)
+        np.testing.assert_array_equal(result, x_f32.astype(np.float64))
+
+        # Test int -> float
+        x_int = np.array([1, 2, 3], dtype=np.int32)
+        ref_float = np.array([0.0], dtype=np.float32)
+        result = uops.astype_like(x_int, ref_float)
+        self.assertEqual(result.dtype, np.float32)
+        np.testing.assert_array_equal(result, x_int.astype(np.float32))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_astype_like_torch(self):
+        """Test astype_like with torch tensors."""
+        # Test float64 -> float32
+        x_f64 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64)
+        ref_f32 = torch.tensor([0.0], dtype=torch.float32)
+        result = uops.astype_like(x_f64, ref_f32)
+        self.assertEqual(result.dtype, torch.float32)
+        torch.testing.assert_close(result, x_f64.type(torch.float32))
+
+        # Test float32 -> float64
+        x_f32 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
+        ref_f64 = torch.tensor([0.0], dtype=torch.float64)
+        result = uops.astype_like(x_f32, ref_f64)
+        self.assertEqual(result.dtype, torch.float64)
+        torch.testing.assert_close(result, x_f32.type(torch.float64))
+
+    @unittest.skipIf(not TORCH_AVAILABLE, "PyTorch not available")
+    def test_astype_like_mixed_types_error(self):
+        """Test that mixing numpy and tensor raises error."""
+        x_np = np.array([1.0, 2.0, 3.0])
+        ref_torch = torch.tensor([0.0])
+
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
+            uops.astype_like(x_np, ref_torch)
+
+        x_torch = torch.tensor([1.0, 2.0, 3.0])
+        ref_np = np.array([0.0])
+
+        with self.assertRaises(spatialkit.IncompatibleTypeError):
+            uops.astype_like(x_torch, ref_np)
+
+    def test_astype_like_same_dtype(self):
+        """Test astype_like when dtypes are already the same."""
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        ref = np.array([0.0], dtype=np.float32)
+        result = uops.astype_like(x, ref)
+        self.assertEqual(result.dtype, np.float32)
+        np.testing.assert_array_equal(result, x)
+
 
 class TestNewArrayOperations(unittest.TestCase):
     """Tests for newly added array operations: ones, zeros, any, sum, maximum, minimum, argmin, argsort."""

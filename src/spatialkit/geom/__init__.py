@@ -28,8 +28,8 @@ from . import pointcloud
 
 # High-level classes for convenience
 from .rotation import Rotation, RotType
-from .pose import Pose
-from .tf import Transform
+from .pose import Pose, interpolate_pose
+from .tf import Transform, interpolate_transform
 
 # Commonly used functions - imported from new modular structure
 from .epipolar import (
@@ -56,6 +56,7 @@ from .pointcloud import (
     down_sample_point_cloud,
     compute_point_cloud_normals,
     depth_to_normal_map,
+    depth_to_normal_map_fast
 )
 
 from .registration import (
@@ -80,6 +81,10 @@ __all__ = [
     "Pose",
     "Transform",
 
+    # Interpolation functions
+    "interpolate_pose",
+    "interpolate_transform",
+
     # Epipolar geometry functions
     "compute_essential_matrix_from_pose",
     "compute_essential_matrix_from_fundamental",
@@ -102,6 +107,7 @@ __all__ = [
     "down_sample_point_cloud",
     "compute_point_cloud_normals",
     "depth_to_normal_map",
+    "depth_to_normal_map_fast",
 
     # Registration functions
     "icp",
