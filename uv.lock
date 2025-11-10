@@ -1924,7 +1924,7 @@ wheels = [
 
 [[package]]
 name = "spatialkit"
-version = "0.3.1"
+version = "0.3.2.post4"
 source = { editable = "." }
 dependencies = [
     { name = "absl-py" },

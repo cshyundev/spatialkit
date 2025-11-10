@@ -103,6 +103,8 @@ def _unproject_depth_to_points(
         mask (np.ndarray, [H*W]): Valid pixel mask.
     """
     rays, mask = cam.convert_to_rays()
+    # Convert rays dtype to match depth dtype (important for numpy 2.0+)
+    rays = astype_like(rays, depth)
     depth_flat = depth.reshape(-1)
 
     if map_type.lower() == "mpi":

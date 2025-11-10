@@ -586,7 +586,7 @@ def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
 
     Returns:
         ArrayLike: The array converted to float type.
-        
+
     Raises:
         InvalidDimensionError: If the specified bit-width is not supported.
     """
@@ -608,6 +608,53 @@ def as_float(x: ArrayLike, n: int = 32) -> ArrayLike:
             return x.astype(np.float16)
         else:
             raise InvalidDimensionError(f"Unsupported bit-width {n} for float conversion. Supported: 16, 32, 64.")
+
+
+def astype_like(x: ArrayLike, reference: ArrayLike) -> ArrayLike:
+    """
+    Converts an array to the same dtype as a reference array.
+
+    This function ensures dtype consistency between arrays, which is particularly
+    useful for avoiding unwanted dtype promotion in operations (e.g., numpy 2.0+).
+
+    Args:
+        x (ArrayLike): The input array to convert.
+        reference (ArrayLike): The reference array whose dtype will be used.
+
+    Returns:
+        ArrayLike: Array with the same dtype as reference.
+
+    Raises:
+        IncompatibleTypeError: If x and reference are not both numpy arrays or both torch tensors.
+
+    Example:
+        >>> import numpy as np
+        >>> x = np.array([1.0, 2.0], dtype=np.float64)
+        >>> ref = np.array([0.0], dtype=np.float32)
+        >>> result = astype_like(x, ref)
+        >>> result.dtype
+        dtype('float32')
+
+        >>> import torch
+        >>> x_t = torch.tensor([1.0, 2.0], dtype=torch.float64)
+        >>> ref_t = torch.tensor([0.0], dtype=torch.float32)
+        >>> result_t = astype_like(x_t, ref_t)
+        >>> result_t.dtype
+        torch.float32
+    """
+    x_is_tensor = is_tensor(x)
+    ref_is_tensor = is_tensor(reference)
+
+    if x_is_tensor != ref_is_tensor:
+        raise IncompatibleTypeError(
+            f"x and reference must be the same type (both numpy or both torch). "
+            f"Got x: {type(x).__name__}, reference: {type(reference).__name__}"
+        )
+
+    if is_tensor(x):
+        return x.type(reference.dtype)
+    else:
+        return x.astype(reference.dtype)
 
 
 def logical_or(*arrays: ArrayLike) -> ArrayLike:
@@ -1374,6 +1421,7 @@ __all__ = [
     # Dtype utilities
     "get_dtype",
     "promote_types",
+    "astype_like",
     # Logical operations
     "logical_or",
     "logical_and",

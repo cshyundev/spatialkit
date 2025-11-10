@@ -480,6 +480,7 @@ __all__ = [
     # Base
     'SpatialKitError',
     'NotArrayLikeError',
+    'InvalidArgumentError',
     
     # Math
     'MathError',
