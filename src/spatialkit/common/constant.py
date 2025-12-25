@@ -18,8 +18,34 @@ Version: 0.2.1
 License: MIT LICENSE
 """
 
+import numpy as np
+
 ## CONSTANT VALUES
 PI = 3.141592
 EPSILON = 1e-9
 NORM_PIXEL_THRESHOLD = 1e-4
 ROTATION_SO3_THRESHOLD = 1e-5
+
+## COORDINATE FRAME TRANSFORMATION MATRICES (4x4)
+# OpenCV (Z-forward, Y-down) → ROS (X-forward, Z-up)
+# ROS: x=opencv_z, y=-opencv_x, z=-opencv_y
+OPENCV_TO_ROS = np.array(
+    [
+        [0, 0, 1, 0],  # ros_x = opencv_z
+        [-1, 0, 0, 0],  # ros_y = -opencv_x
+        [0, -1, 0, 0],  # ros_z = -opencv_y
+        [0, 0, 0, 1],
+    ],
+    dtype=np.float32,
+)
+
+# OpenCV (Z-forward, Y-down) → OpenGL (Z-backward, Y-up)
+OPENCV_TO_OPENGL = np.array(
+    [
+        [1, 0, 0, 0],
+        [0, -1, 0, 0],
+        [0, 0, -1, 0],
+        [0, 0, 0, 1],
+    ],
+    dtype=np.float32,
+)
