@@ -286,5 +286,26 @@ class RadialCamera(Camera):
         output_image = self._warp(image, uv)
         return output_image
 
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the RadialCamera.
+
+        Returns:
+            str: Multi-line string showing camera parameters.
+        """
+        fov_x, fov_y = self.fov
+        has_dist = self.has_distortion()
+        lines = [
+            f"{self.__class__.__name__}(",
+            f"  type={self.cam_type.value[0]}",
+            f"  size=({self.width}, {self.height})",
+            f"  f=({self.fx:.4f}, {self.fy:.4f})",
+            f"  c=({self.cx:.4f}, {self.cy:.4f})",
+            f"  fov=({fov_x:.1f}, {fov_y:.1f}) deg",
+            f"  distortion={has_dist}",
+            ")",
+        ]
+        return "\n".join(lines)
+
 
 __all__ = ["RadialCamera"]

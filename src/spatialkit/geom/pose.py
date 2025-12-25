@@ -127,18 +127,27 @@ class Pose:
     @staticmethod
     def from_rot_vec_t(rot_vec: ArrayLike, t: ArrayLike) -> "Pose":
         """
-        Create Pose from rotation vector and translation.
-        
+        Create a Pose from a rotation vector (axis-angle) and translation.
+
         Args:
-            rot_vec (ArrayLike): Rotation vector of shape (..., 3).
-            t (ArrayLike): Translation vector.
-            
+            rot_vec (ArrayLike, (3,)): Axis-angle rotation vector where the direction
+                represents the rotation axis and the magnitude represents
+                the rotation angle in radians.
+            t (ArrayLike, (3,) or (1, 3)): Translation vector representing
+                the position in 3D space [x, y, z].
+
         Returns:
-            Pose: New Pose instance.
-            
+            Pose: New Pose instance with the specified rotation and translation.
+
         Raises:
-            IncompatibleTypeError: If inputs are not array-like.
-            InvalidShapeError: If rotation vector doesn't have shape ending with 3.
+            IncompatibleTypeError: If rot_vec or t is not array-like.
+            InvalidShapeError: If rotation vector doesn't have shape (3,).
+
+        Example:
+            >>> import numpy as np
+            >>> rot_vec = np.array([0.0, 0.0, np.pi/2])  # 90 deg around z-axis
+            >>> t = np.array([1.0, 2.0, 3.0])
+            >>> pose = Pose.from_rot_vec_t(rot_vec, t)
         """
         if not is_array(rot_vec):
             raise IncompatibleTypeError(
@@ -164,17 +173,22 @@ class Pose:
         Create a Pose from a transformation matrix.
 
         Args:
-            mat4 (ArrayLike): Transformation matrix of shape (3,4) or (4,4).
+            mat4 (ArrayLike, (3, 4) or (4, 4)): Transformation matrix where
+                the upper-left 3x3 block is the rotation matrix (SO3) and
+                the first 3 elements of the last column are the translation vector.
+                For (4, 4) matrices, the last row should be [0, 0, 0, 1].
 
         Returns:
-            Pose: Pose object created from the transformation matrix.
+            Pose: Pose instance created from the transformation matrix.
 
         Raises:
-            IncompatibleTypeError: If mat4 is not an array type (Tensor or Numpy).
-            InvalidShapeError: If mat4 shape is not (3,4) or (4,4).
+            IncompatibleTypeError: If mat4 is not array-like (numpy array or tensor).
+            InvalidShapeError: If mat4 shape is not (3, 4) or (4, 4).
 
         Example:
+            >>> import numpy as np
             >>> mat = np.eye(4)
+            >>> mat[:3, 3] = [1.0, 2.0, 3.0]  # set translation
             >>> pose = Pose.from_mat(mat)
         """
         if not is_array(mat4):
@@ -213,6 +227,25 @@ class Pose:
         R_inv = self._rot.inverse()
         t_inv = -R_inv.apply_pts3d(transpose2d(self.t))
         return Pose(transpose2d(t_inv), R_inv)
+
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the Pose.
+
+        Returns:
+            str: Multi-line string showing translation and rotation matrix.
+        """
+        t = self._t.flatten()
+        mat = self._rot.data
+        lines = [
+            "Pose(",
+            f"  t=[{t[0]:8.4f}, {t[1]:8.4f}, {t[2]:8.4f}]",
+            f"  R=[{mat[0,0]:8.4f}, {mat[0,1]:8.4f}, {mat[0,2]:8.4f}]",
+            f"    [{mat[1,0]:8.4f}, {mat[1,1]:8.4f}, {mat[1,2]:8.4f}]",
+            f"    [{mat[2,0]:8.4f}, {mat[2,1]:8.4f}, {mat[2,2]:8.4f}]",
+            ")",
+        ]
+        return "\n".join(lines)
 
 
 def interpolate_pose(pose1: Pose, pose2: Pose, t: float) -> Pose:

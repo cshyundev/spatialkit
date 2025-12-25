@@ -169,5 +169,24 @@ class DoubleSphereCamera(Camera):
 
         return uv, mask  # (2,HW)
 
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the DoubleSphereCamera.
+
+        Returns:
+            str: Multi-line string showing camera parameters.
+        """
+        lines = [
+            f"{self.__class__.__name__}(",
+            f"  type={self.cam_type.value[0]}",
+            f"  size=({self.width}, {self.height})",
+            f"  f=({self.fx:.4f}, {self.fy:.4f})",
+            f"  c=({self.cx:.4f}, {self.cy:.4f})",
+            f"  xi={self.xi:.4f}, alpha={self.alpha:.4f}",
+            f"  fov={self._max_fov_deg:.1f} deg",
+            ")",
+        ]
+        return "\n".join(lines)
+
 
 __all__ = ["DoubleSphereCamera"]

@@ -60,6 +60,22 @@ class RotType(Enum):
 
     @staticmethod
     def from_string(type_str: str) -> "RotType":
+        """
+        Create a RotType from a string representation.
+
+        Args:
+            type_str (str): String representation of rotation type.
+                Valid values: "SO3", "so3", "QUAT_XYZW", "QUAT_WXYZ", "RPY".
+
+        Returns:
+            RotType: Corresponding rotation type enum value.
+                Returns RotType.NONE if the string is not recognized.
+
+        Example:
+            >>> rot_type = RotType.from_string("SO3")
+            >>> rot_type == RotType.SO3
+            True
+        """
         if type_str == "SO3":
             return RotType.SO3
         if type_str == "so3":
@@ -447,22 +463,114 @@ class Rotation:
     # constructor
     @staticmethod
     def from_mat3(mat3: ArrayLike) -> "Rotation":
+        """
+        Create a Rotation from a 3x3 rotation matrix (SO3).
+
+        Args:
+            mat3 (ArrayLike, (3, 3)): Rotation matrix satisfying SO3 properties
+                (orthogonal matrix with determinant 1).
+
+        Returns:
+            Rotation: Rotation instance initialized from the matrix.
+
+        Raises:
+            GeometryError: If mat3 is not a valid SO3 matrix.
+
+        Example:
+            >>> import numpy as np
+            >>> mat = np.eye(3)
+            >>> rot = Rotation.from_mat3(mat)
+        """
         return Rotation(mat3, RotType.SO3)
 
     @staticmethod
     def from_so3(so3: ArrayLike) -> "Rotation":
+        """
+        Create a Rotation from an axis-angle (so3) vector.
+
+        Args:
+            so3 (ArrayLike, (3,)): Axis-angle vector where the direction
+                represents the rotation axis and the magnitude represents
+                the rotation angle in radians.
+
+        Returns:
+            Rotation: Rotation instance initialized from the so3 vector.
+
+        Raises:
+            GeometryError: If so3 is not a valid axis-angle vector.
+
+        Example:
+            >>> import numpy as np
+            >>> so3_vec = np.array([0.0, 0.0, np.pi/2])  # 90 deg around z-axis
+            >>> rot = Rotation.from_so3(so3_vec)
+        """
         return Rotation(so3, RotType.so3)
 
     @staticmethod
     def from_quat_xyzw(quat: ArrayLike) -> "Rotation":
+        """
+        Create a Rotation from a quaternion in (x, y, z, w) format.
+
+        Args:
+            quat (ArrayLike, (4,)): Unit quaternion with imaginary parts first,
+                real part last [x, y, z, w]. Must have unit norm.
+
+        Returns:
+            Rotation: Rotation instance initialized from the quaternion.
+
+        Raises:
+            GeometryError: If quat is not a valid unit quaternion.
+
+        Example:
+            >>> import numpy as np
+            >>> quat = np.array([0.0, 0.0, 0.0, 1.0])  # identity rotation
+            >>> rot = Rotation.from_quat_xyzw(quat)
+        """
         return Rotation(quat, RotType.QUAT_XYZW)
 
     @staticmethod
     def from_quat_wxyz(quat: ArrayLike) -> "Rotation":
+        """
+        Create a Rotation from a quaternion in (w, x, y, z) format.
+
+        Args:
+            quat (ArrayLike, (4,)): Unit quaternion with real part first,
+                imaginary parts last [w, x, y, z]. Must have unit norm.
+
+        Returns:
+            Rotation: Rotation instance initialized from the quaternion.
+
+        Raises:
+            GeometryError: If quat is not a valid unit quaternion.
+
+        Example:
+            >>> import numpy as np
+            >>> quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity rotation
+            >>> rot = Rotation.from_quat_wxyz(quat)
+        """
         return Rotation(quat, RotType.QUAT_WXYZ)
 
     @staticmethod
     def from_rpy(rpy: ArrayLike) -> "Rotation":
+        """
+        Create a Rotation from Roll-Pitch-Yaw (Euler) angles.
+
+        Args:
+            rpy (ArrayLike, (3,)): Euler angles [roll, pitch, yaw] in radians.
+                Roll is rotation around x-axis, pitch around y-axis,
+                yaw around z-axis.
+
+        Returns:
+            Rotation: Rotation instance initialized from RPY angles.
+
+        Raises:
+            GeometryError: If rpy is not a valid RPY vector.
+
+        Example:
+            >>> import numpy as np
+            >>> rpy = np.array([0.0, 0.0, np.pi/2])  # 90 deg yaw
+            >>> rot = Rotation.from_rpy(rpy)
+        """
         return Rotation(rpy, RotType.RPY)
 
     def mat(self) -> np.ndarray:
@@ -574,13 +682,13 @@ class Rotation:
     def __mul__(self, other: Any) -> Union["Rotation", ArrayLike]:
         """
         Multiplication operator for rotation composition or point transformation.
-        
+
         Args:
             other: Either another Rotation for composition or ArrayLike for point transformation.
-            
+
         Returns:
             Union[Rotation, ArrayLike]: Composed rotation or transformed points.
-            
+
         Raises:
             IncompatibleTypeError: If other is not a supported type.
         """
@@ -592,6 +700,23 @@ class Rotation:
             f"Unsupported data type {type(other)} for multiplication with Rotation. "
             f"Supported types: Rotation (for composition) or ArrayLike (for point transformation)."
         )
+
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the Rotation.
+
+        Returns:
+            str: Multi-line string showing the SO3 rotation matrix.
+        """
+        mat = self.data
+        lines = [
+            "Rotation(",
+            f"  SO3=[{mat[0,0]:8.4f}, {mat[0,1]:8.4f}, {mat[0,2]:8.4f}]",
+            f"      [{mat[1,0]:8.4f}, {mat[1,1]:8.4f}, {mat[1,2]:8.4f}]",
+            f"      [{mat[2,0]:8.4f}, {mat[2,1]:8.4f}, {mat[2,2]:8.4f}]",
+            ")",
+        ]
+        return "\n".join(lines)
 
 
 def slerp(r1: Rotation, r2: Rotation, t: float):
