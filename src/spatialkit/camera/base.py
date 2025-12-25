@@ -284,5 +284,20 @@ class Camera:
             LOG_CRITICAL(f"{cam_type.name} camera type is not supported.")
             return None
 
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the Camera.
+
+        Returns:
+            str: Multi-line string showing camera type and image size.
+        """
+        lines = [
+            f"{self.__class__.__name__}(",
+            f"  type={self.cam_type.value[0]}",
+            f"  size=({self.width}, {self.height})",
+            ")",
+        ]
+        return "\n".join(lines)
+
 
 __all__ = ["CamType", "Camera"]

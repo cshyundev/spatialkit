@@ -31,8 +31,8 @@ class Transform:
     This class encapsulates both the translation and rotation components of a transformation.
 
     Attributes:
-        t (np.ndarray, [1,3] or [3,]): Translation vector
-        rot (Rotation): Rotation instance
+        t (np.ndarray, (1, 3)): Translation vector.
+        rot (Rotation): Rotation instance.
     """
 
     def __init__(self, t: Optional[ArrayLike] = None, rot: Optional[Rotation] = None):
@@ -81,18 +81,27 @@ class Transform:
     @staticmethod
     def from_rot_vec_t(rot_vec: ArrayLike, t: ArrayLike) -> "Transform":
         """
-        Create a Transform from a rotation vector and translation vector.
+        Create a Transform from a rotation vector (axis-angle) and translation.
 
         Args:
-            rot_vec (ArrayLike): Rotation vector of shape (3,).
-            t (ArrayLike): Translation vector of shape (3,).
+            rot_vec (ArrayLike, (3,)): Axis-angle rotation vector where the direction
+                represents the rotation axis and the magnitude represents
+                the rotation angle in radians.
+            t (ArrayLike, (3,) or (1, 3)): Translation vector representing
+                the position in 3D space [x, y, z].
 
         Returns:
-            Transform: Transform instance.
-            
+            Transform: Transform instance with the specified rotation and translation.
+
         Raises:
-            IncompatibleTypeError: If inputs are not array-like.
-            InvalidDimensionError: If vectors don't have size 3.
+            IncompatibleTypeError: If rot_vec or t is not array-like.
+            InvalidDimensionError: If rot_vec or t doesn't have exactly 3 elements.
+
+        Example:
+            >>> import numpy as np
+            >>> rot_vec = np.array([0.0, 0.0, np.pi/2])  # 90 deg around z-axis
+            >>> t = np.array([1.0, 2.0, 3.0])
+            >>> tf = Transform.from_rot_vec_t(rot_vec, t)
         """
         if not is_array(rot_vec):
             raise IncompatibleTypeError(
@@ -124,17 +133,26 @@ class Transform:
     @staticmethod
     def from_mat(mat4: ArrayLike) -> "Transform":
         """
-        Create a Transform from a 4x4 transformation matrix.
+        Create a Transform from a transformation matrix.
 
         Args:
-            mat4 (ArrayLike): Transformation matrix of shape (4,4) or (3,4).
+            mat4 (ArrayLike, (3, 4) or (4, 4)): Transformation matrix where
+                the upper-left 3x3 block is the rotation matrix (SO3) and
+                the first 3 elements of the last column are the translation vector.
+                For (4, 4) matrices, the last row should be [0, 0, 0, 1].
 
         Returns:
-            Transform: Transform instance.
-            
+            Transform: Transform instance created from the transformation matrix.
+
         Raises:
-            IncompatibleTypeError: If mat4 is not array-like.
-            InvalidShapeError: If mat4 doesn't have shape (4,4) or (3,4).
+            IncompatibleTypeError: If mat4 is not array-like (numpy array or tensor).
+            InvalidShapeError: If mat4 shape is not (3, 4) or (4, 4).
+
+        Example:
+            >>> import numpy as np
+            >>> mat = np.eye(4)
+            >>> mat[:3, 3] = [1.0, 2.0, 3.0]  # set translation
+            >>> tf = Transform.from_mat(mat)
         """
         if not is_array(mat4):
             raise IncompatibleTypeError(
@@ -150,6 +168,20 @@ class Transform:
 
     @staticmethod
     def from_pose(pose: Pose) -> "Transform":
+        """
+        Create a Transform from a Pose instance.
+
+        Args:
+            pose (Pose): Pose instance containing translation and rotation.
+
+        Returns:
+            Transform: Transform instance with the same translation and rotation as the pose.
+
+        Example:
+            >>> import numpy as np
+            >>> pose = Pose(np.array([1.0, 2.0, 3.0]), Rotation.from_mat3(np.eye(3)))
+            >>> tf = Transform.from_pose(pose)
+        """
         return Transform(pose.t, Rotation.from_mat3(pose.rot_mat()))
 
     def rot_mat(self) -> np.ndarray:
@@ -157,7 +189,7 @@ class Transform:
         Get the rotation matrix of the transform.
 
         Returns:
-            rot_mat (np.ndarray, [3,3]): Rotation matrix
+            np.ndarray, (3, 3): Rotation matrix (SO3).
         """
         return self.rot.mat()
 
@@ -166,7 +198,7 @@ class Transform:
         Get the 3x4 transformation matrix of the transform.
 
         Returns:
-            tf_mat (np.ndarray, [3,4]): Transformation matrix
+            np.ndarray, (3, 4): Transformation matrix [R | t].
         """
         return concat([self.rot_mat(), transpose2d(self.t)], dim=1)
 
@@ -175,7 +207,7 @@ class Transform:
         Get the 4x4 transformation matrix of the transform.
 
         Returns:
-            tf_mat (np.ndarray, [4,4]): Transformation matrix
+            np.ndarray, (4, 4): Homogeneous transformation matrix [[R | t], [0 0 0 1]].
         """
         mat34 = self.mat34()
         last = np.array([0.0, 0.0, 0.0, 1.0]).reshape(1, 4)
@@ -186,8 +218,9 @@ class Transform:
         Get the rotation vector and translation vector of the transform.
 
         Returns:
-            rot_vec (np.ndarray, [3,]): Rotation vector
-            t (np.ndarray, [3,]): Translation vector
+            tuple: A tuple containing:
+                - rot_vec (np.ndarray, (3,)): Axis-angle rotation vector.
+                - t (np.ndarray, (1, 3)): Translation vector.
         """
         return self.rot.so3(), self.t
 
@@ -196,13 +229,13 @@ class Transform:
         Get the skew-symmetric matrix of the translation vector.
 
         Returns:
-            skew_mat(np.ndarray, [3,3]): Skew-symmetric matrix
+            np.ndarray, (3, 3): Skew-symmetric matrix of translation.
 
-        Details:
-        - t = [tx,ty,tz]
-        - skew_x = |0 -tz  ty|
-                   |tz  0 -tx|
-                   |-ty tx  0|
+        Note:
+            For t = [tx, ty, tz], the skew-symmetric matrix is:
+            [[  0, -tz,  ty],
+             [ tz,   0, -tx],
+             [-ty,  tx,   0]]
         """
         return vec3_to_skew(self.t)
 
@@ -211,8 +244,9 @@ class Transform:
         Get the translation vector and rotation matrix of the transform.
 
         Returns:
-            t (np.ndarray, [3,]): Translation vector
-            rot_mat (np.ndarray, [3,3]): Rotation vector
+            tuple: A tuple containing:
+                - t (np.ndarray, (1, 3)): Translation vector.
+                - rot_mat (np.ndarray, (3, 3)): Rotation matrix (SO3).
         """
         return self.t, self.rot_mat()
 
@@ -232,14 +266,15 @@ class Transform:
         Get the origin and direction vectors from rays (local coordinates).
 
         Args:
-            rays (ArrayLike): Camera rays from origin of shape (3,N) or (3,).
+            rays (ArrayLike, (3, N) or (3,)): Camera rays from origin in local coordinates.
 
         Returns:
-            origins (ArrayLike): Origin in world coordinates of shape (N,3).
-            directions (ArrayLike): Unit direction vector in world coordinates of shape (N,3).
-            
+            tuple: A tuple containing:
+                - origins (ArrayLike, (N, 3)): Origin in world coordinates.
+                - directions (ArrayLike, (N, 3)): Unit direction vector in world coordinates.
+
         Raises:
-            InvalidShapeError: If rays don't have the correct shape.
+            InvalidShapeError: If rays don't have shape (3, N) or (3,).
         """
         if not (len(rays.shape) <= 2 and rays.shape[0] == 3):
             raise InvalidShapeError(
@@ -276,10 +311,10 @@ class Transform:
         Apply the transform to 3D points.
 
         Args:
-            pts3d (ArrayLike, [3,N]): 3D points
+            pts3d (ArrayLike, (3, N)): 3D points where each column is a point [x, y, z].
 
         Returns:
-            pts3d (ArrayLike, [3,N]) : Transformed 3D points
+            ArrayLike, (3, N): Transformed 3D points.
         """
         t = transpose2d(convert_array(self.t, pts3d))
         return self.rot.apply_pts3d(pts3d) + t
@@ -318,6 +353,25 @@ class Transform:
             raise ValueError(
                 "Multiplication only supported with Transform, Pose or 3D points."
             )
+
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the Transform.
+
+        Returns:
+            str: Multi-line string showing translation and rotation matrix.
+        """
+        t = self._t.flatten()
+        mat = self._rot.data
+        lines = [
+            "Transform(",
+            f"  t=[{t[0]:8.4f}, {t[1]:8.4f}, {t[2]:8.4f}]",
+            f"  R=[{mat[0,0]:8.4f}, {mat[0,1]:8.4f}, {mat[0,2]:8.4f}]",
+            f"    [{mat[1,0]:8.4f}, {mat[1,1]:8.4f}, {mat[1,2]:8.4f}]",
+            f"    [{mat[2,0]:8.4f}, {mat[2,1]:8.4f}, {mat[2,2]:8.4f}]",
+            ")",
+        ]
+        return "\n".join(lines)
 
 
 def interpolate_transform(t1: Transform, t2: Transform, alpha: float) -> Transform:

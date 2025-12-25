@@ -142,5 +142,23 @@ class OmnidirectionalCamera(Camera):
         cam_dict["inv_poly_coeffs"] = self.inv_poly_coeffs.tolist()
         return cam_dict
 
+    def __repr__(self) -> str:
+        """
+        Return a verbose string representation of the OmnidirectionalCamera.
+
+        Returns:
+            str: Multi-line string showing camera parameters.
+        """
+        lines = [
+            f"{self.__class__.__name__}(",
+            f"  type={self.cam_type.value[0]}",
+            f"  size=({self.width}, {self.height})",
+            f"  center=({self.cx:.4f}, {self.cy:.4f})",
+            f"  fov={self._max_fov_deg:.1f} deg",
+            f"  poly_order={len(self.poly_coeffs)}",
+            ")",
+        ]
+        return "\n".join(lines)
+
 
 __all__ = ["OmnidirectionalCamera"]
