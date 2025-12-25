@@ -1,7 +1,7 @@
 # spatialkit
 
-**Current Version:** 0.3.2 \
-**Last Updated:** November 9, 2025
+**Current Version:** 0.3.3 \
+**Last Updated:** December 25, 2025
 
 ## License
 
