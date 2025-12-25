@@ -18,6 +18,19 @@ if [ -z "$TESTPYPI_TOKEN" ]; then
     exit 1
 fi
 
+# Confirmation prompt
+echo "📦 You are about to publish to TestPyPI"
+echo "Package: spatialkit"
+echo "Version: $(grep '__version__' src/spatialkit/__init__.py | cut -d'"' -f2)"
+echo ""
+read -p "Are you sure you want to continue? (yes/no): " confirm
+
+if [ "$confirm" != "yes" ]; then
+    echo "❌ Publish cancelled"
+    exit 1
+fi
+
+echo ""
 echo "📦 Publishing to TestPyPI..."
 
 # Build first
